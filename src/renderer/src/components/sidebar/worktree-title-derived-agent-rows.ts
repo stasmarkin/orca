@@ -285,7 +285,7 @@ export function resolveAgentTypeFromTerminalTitle(
     : null
 }
 
-function titleStatusToRowState(
+export function titleStatusToRowState(
   status: 'working' | 'permission' | 'idle'
 ): AgentStatusState | 'idle' {
   if (status === 'permission') {
