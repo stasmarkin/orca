@@ -10,6 +10,7 @@ import { PROJECT_GROUP_META, PR_GROUP_META } from './group-keys'
 import type { PRGroupKey } from './group-keys'
 import type { NoticeHostContext } from './host-labels'
 import {
+  getLaneHostCountedWorkspaceIds,
   getLaneHostWorktreeCounts,
   getLaneHostWorktreeIds,
   getMixedHostContextLabels
@@ -30,6 +31,7 @@ import type {
   WorktreeGroupBy
 } from './row-types'
 import { orderMainWorktreeFirst } from './section-order'
+import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
 
 /** Everything section emission reads that stays fixed for one buildRows call. */
 export type SectionAppendContext = {
@@ -79,6 +81,12 @@ export function appendOrderedGroups(
     const isCollapsed = collapsedGroups.has(key)
     const repo = group.repo
     const folderPairs = group.folderWorkspaces ?? []
+    // Why folderWorkspaceKey: the badge intersects these against the dashboard's attention set,
+    // which keys folder workspaces the same way folderWorkspaceToWorktree does.
+    const laneWorkspaceIds = [
+      ...group.items.map((worktree) => worktree.id),
+      ...folderPairs.map((pair) => folderWorkspaceKey(pair.folderWorkspace.id))
+    ]
     const header =
       groupBy === 'repo'
         ? {
@@ -89,7 +97,8 @@ export function appendOrderedGroups(
             tone: PROJECT_GROUP_META.tone,
             icon: PROJECT_GROUP_META.icon,
             repo,
-            projectGroupDepth
+            projectGroupDepth,
+            countedWorkspaceIds: group.items.map((worktree) => worktree.id)
           }
         : groupBy === 'workspace-status'
           ? (() => {
@@ -118,7 +127,14 @@ export function appendOrderedGroups(
                   repoMap,
                   defaultHostId
                 ),
-                worktreeIds: group.items.map((worktree) => worktree.id)
+                worktreeIds: group.items.map((worktree) => worktree.id),
+                countedWorkspaceIds: laneWorkspaceIds,
+                hostCountedWorkspaceIds: getLaneHostCountedWorkspaceIds(
+                  group.items,
+                  folderPairs,
+                  repoMap,
+                  defaultHostId
+                )
               }
             })()
           : (() => {
@@ -143,7 +159,14 @@ export function appendOrderedGroups(
                   repoMap,
                   defaultHostId
                 ),
-                worktreeIds: group.items.map((worktree) => worktree.id)
+                worktreeIds: group.items.map((worktree) => worktree.id),
+                countedWorkspaceIds: laneWorkspaceIds,
+                hostCountedWorkspaceIds: getLaneHostCountedWorkspaceIds(
+                  group.items,
+                  folderPairs,
+                  repoMap,
+                  defaultHostId
+                )
               }
             })()
 
