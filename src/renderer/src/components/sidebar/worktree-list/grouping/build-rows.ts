@@ -14,11 +14,13 @@ import { ALL_GROUP_KEY, ALL_GROUP_META } from './group-keys'
 import { appendOrderedGroups } from './group-sections'
 import type { SectionAppendContext } from './group-sections'
 import {
+  getLaneHostCountedWorkspaceIds,
   getLaneHostWorktreeCounts,
   getLaneHostWorktreeIds,
   getMixedWorktreeHostContextLabels,
   getNoticeHostContextLabels
 } from './host-labels'
+import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import { buildProjectGroupingIndex } from './project-grouping'
 import type { ProjectGroupingModel } from './project-grouping'
 import { appendProjectGroupSections } from './project-group-sections'
@@ -174,7 +176,17 @@ export function buildRows(
           repoMap,
           defaultHostId
         ),
-        worktreeIds: naturalWorktrees.map((worktree) => worktree.id)
+        worktreeIds: naturalWorktrees.map((worktree) => worktree.id),
+        countedWorkspaceIds: [
+          ...naturalWorktrees.map((worktree) => worktree.id),
+          ...renderableFolderWorkspaces.map((pair) => folderWorkspaceKey(pair.folderWorkspace.id))
+        ],
+        hostCountedWorkspaceIds: getLaneHostCountedWorkspaceIds(
+          naturalWorktrees,
+          renderableFolderWorkspaces,
+          repoMap,
+          defaultHostId
+        )
       })
       if (!collapsedGroups.has(ALL_GROUP_KEY)) {
         appendWorktreeRows(result, naturalWorktrees, repoMap, lineageById, worktreeMap, {
