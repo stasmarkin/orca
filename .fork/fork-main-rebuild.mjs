@@ -2,11 +2,19 @@
 // that records the recipe. Nothing is rebased here — fork main is an output, never a source.
 import { existsSync, mkdtempSync, rmSync, symlinkSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve as resolvePath } from 'node:path'
 
 import { git, repoRoot, resolve } from './git-commands.mjs'
 import { markerMessage } from './sync-marker.mjs'
 import { typecheckTree } from './build-verification.mjs'
+
+/** Names the last rebuilt tree so it survives gc and `just install` can check what it installs. */
+export const BUILD_REF = 'refs/fork-sync/build'
+
+/** Printed with every failure that keeps the scratch tree: it holds a link into the real install. */
+function cleanupHint(scratch) {
+  return `Then: rm -f ${join(scratch, 'node_modules')} && git worktree remove --force ${scratch} && just sync`
+}
 
 /**
  * A scratch worktree has no node_modules, so generated files could not be regenerated there — and a
@@ -54,12 +62,23 @@ export function rebuildForkMain(parts, { base, dryRun, verify }) {
           keepScratch = true
           throw new Error(describeConflict(part.branch, scratch, error.message))
         }
+        // No MERGE_HEAD means the merge never started — a bad ref, a dirty tree — and committing
+        // here would record something nobody merged under a "resolved from rerere" subject.
+        // --git-path answers relative to its own cwd, so it has to be re-anchored on the scratch tree.
+        const mergeHead = resolvePath(
+          scratch,
+          git(['rev-parse', '--git-path', 'MERGE_HEAD'], { cwd: scratch })
+        )
+        // Not kept: with no merge in progress there is nothing in that tree to resolve.
+        if (!existsSync(mergeHead)) {
+          throw error
+        }
         git(['commit', '--no-verify', '-m', `${message} (conflict resolved from rerere cache)`], {
           cwd: scratch
         })
       }
     }
-    git(['commit', '--allow-empty', '-m', markerMessage({ base: baseSha, parts })], {
+    git(['commit', '--no-verify', '--allow-empty', '-m', markerMessage({ base: baseSha, parts })], {
       cwd: scratch
     })
     if (verify) {
@@ -70,11 +89,16 @@ export function rebuildForkMain(parts, { base, dryRun, verify }) {
         throw new Error(
           `The rebuilt fork main does not typecheck, so it is not published.\n` +
             `Every branch typechecks alone, so the break comes from how two of them combine.\n` +
-            `Inspect ${scratch}, fix it in the feature branch that owns the code, then: just sync\n\n${failure}`
+            `Inspect ${scratch}, fix it in the feature branch that owns the code.\n` +
+            `${cleanupHint(scratch)}\n\n${failure}`
         )
       }
     }
-    return { sha: git(['rev-parse', 'HEAD'], { cwd: scratch }), parts, base: baseSha }
+    const sha = git(['rev-parse', 'HEAD'], { cwd: scratch })
+    // The build lives in a detached worktree that is about to go away, leaving the commit
+    // unreachable and collectable. A ref keeps it, and gives `just install` something to name.
+    git(['update-ref', BUILD_REF, sha])
+    return { sha, parts, base: baseSha }
   } finally {
     if (!keepScratch) {
       unlinkNodeModules(scratch)
@@ -95,6 +119,6 @@ function describeConflict(branch, scratch, detail) {
     `records the resolution and replays it automatically on the next sync. Generated files\n` +
     `(src/cli/bundled-skill-guides.ts) are rebuilt rather than merged: run their generator with that\n` +
     `tree as the working directory, or it silently reads this repository instead.\n` +
-    `Then: rm -f ${join(scratch, 'node_modules')} && git worktree remove --force ${scratch} && just sync\n\n${detail}`
+    `${cleanupHint(scratch)}\n\n${detail}`
   )
 }

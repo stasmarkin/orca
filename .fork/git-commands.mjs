@@ -18,11 +18,16 @@ export function gh(args, options = {}) {
   return run('gh', args, options)
 }
 
+// The 1 MiB default truncates and then throws with empty stdout and stderr, which surfaces as a
+// command that "failed:" with no reason at all — `git log` over a rebuilt tree passes it easily.
+const MAX_OUTPUT_BYTES = 64 * 1024 * 1024
+
 function run(bin, args, { cwd = REPO_ROOT, allowFail = false } = {}) {
   try {
     return execFileSync(bin, args, {
       cwd,
       encoding: 'utf8',
+      maxBuffer: MAX_OUTPUT_BYTES,
       stdio: ['ignore', 'pipe', 'pipe']
     }).trim()
   } catch (error) {
@@ -56,7 +61,9 @@ export function countCommits(from, to) {
 
 /** @param {string} cwd */
 export function isWorkingTreeClean(cwd) {
-  return git(['status', '--porcelain'], { cwd }) === ''
+  // Untracked files are excluded: they do not stop a rebase, and a workspace that has collected a
+  // scratch file or a build artefact is the normal state, not a reason to refuse to sync.
+  return git(['status', '--porcelain', '--untracked-files=no'], { cwd }) === ''
 }
 
 /** Branch name -> absolute worktree path, for every branch checked out somewhere. */

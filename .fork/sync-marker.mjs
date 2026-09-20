@@ -14,26 +14,28 @@ export function markerMessage({ base, parts }) {
   return lines.join('\n')
 }
 
-/** @param {string} ref @returns {string | null} */
-export function findMarker(ref) {
+/**
+ * Matched as a whole subject line, and only among the commits this fork adds on top of upstream.
+ * A --grep for the phrase would also hit an ordinary commit that merely mentions it in its body,
+ * and everything below that false marker would be reported as drift.
+ * @param {string} ref @param {string} base @returns {string | null}
+ */
+export function findMarker(ref, base) {
   if (!exists(ref)) {
     return null
   }
-  const sha = git(
-    ['log', '--format=%H', '--max-count=1', '--fixed-strings', `--grep=${SUBJECT}`, ref],
-    {
-      allowFail: true
-    }
-  )
-  return sha === '' ? null : sha
+  const own = git(['log', '--format=%H%x00%s', ref, '--not', base]).split('\n').filter(Boolean)
+  const hit = own.find((line) => line.split('\0')[1] === SUBJECT)
+  return hit === undefined ? null : hit.split('\0')[0]
 }
 
 /**
  * @param {string} ref
+ * @param {string} base
  * @returns {{state: 'clean' | 'drifted' | 'unmanaged', marker: string | null, extra: string[]}}
  */
-export function inspectDrift(ref) {
-  const marker = findMarker(ref)
+export function inspectDrift(ref, base) {
+  const marker = findMarker(ref, base)
   if (marker === null) {
     return { state: 'unmanaged', marker: null, extra: [] }
   }

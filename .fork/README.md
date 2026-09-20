@@ -13,13 +13,19 @@ The split that resolves it:
 ```bash
 just fork-status     # what the fork carries; what upstream did with each pull request
 just fork-check      # has anything been committed to fork main outside the manifest
-just sync-dry        # full sync, changing nothing
+just fork-test       # tests for this tooling
+just sync-dry        # full sync, changing nothing local
 just sync            # rebase every branch, rebuild fork main, push, report on the pull requests
 ```
 
 `just sync` in order: fetch upstream → read pull request states → refuse to run if the manifest is stale → rebase each branch onto `origin/main` → rebuild `fork/main` from scratch → typecheck the result → force-push the branches and `fork/main` → print pull request mergeability.
 
-Flags, all passed through by `just sync`: `--no-push` stops after the rebuild, `--skip-verify` skips the typecheck, `--allow-drift` discards commits made directly to `fork/main`, `--dry-run` changes nothing.
+Flags, all passed through by `just sync`: `--no-push` stops after the rebuild, `--skip-verify` skips the typecheck, `--allow-drift` discards commits made directly to `fork/main`, `--dry-run` rebases nothing and publishes nothing. Every command starts with a fetch, `--dry-run` included, so remote-tracking refs do move.
+
+Two side effects worth knowing about, both deliberate:
+
+- `just sync` sets `rerere.enabled` and `rerere.autoUpdate` for this repository, which changes **all** manual merges here, not only the rebuild: a conflict you have resolved once is replayed and staged for you.
+- Each rebuild is recorded at `refs/fork-sync/build`, which is also what keeps the commit from being garbage-collected once the scratch worktree is gone. `just install` refuses to install a tree that is not that build (`force=yes` overrides), because a checkout sitting on one feature branch builds an app missing every other feature, and nothing about the result says so.
 
 ## Why it refuses to run on a merged feature
 
@@ -53,9 +59,19 @@ Fork-Feature: <branch> <sha>
 
 So `fork/main` documents its own build with no lock file to keep in step. If the marker is not at the tip, someone committed straight to `fork/main`; `just fork-check` lists those commits, and `just sync` refuses to discard them without `--allow-drift`.
 
+A `fork/main` with **no marker at all** — one built by hand before this tooling existed — needs the same flag, and for a stronger reason: nothing on it is known to come from the manifest, so the rebuild replaces all of it. Check `git log --oneline origin/main..refs/remotes/fork/main` before passing the flag, and move anything worth keeping into a branch listed in `.fork/features.yaml`.
+
 ## Frozen features
 
 `kind: frozen` documents a branch that is too far behind to replay — the Arcadia stack sits 600+ commits back, across an upstream source-control refactor, so reviving it is a rewrite rather than a rebase. It stays in the manifest for the record and out of the build.
+
+## What the publish step refuses to do
+
+Everything goes out in one atomic push, so a lease that fails cannot leave the fork holding some branches from this build and some from the last one.
+
+The obvious check — "is the remote ahead of me" — is dead exactly when a rebase happened, which is every sync: a rebased branch always carries commits the remote has never seen. `--force-with-lease` does not help either, because the lease is taken from the ref this sync just fetched, so it is satisfied by the very commit that would be lost.
+
+So commits are matched **by patch id, not by sha**. A commit on the fork counts as foreign only when nothing on either side we know about carries the same patch: neither the branch about to be published, nor `refs/fork-sync/published/<branch>`, which records what this tool last pushed. The first side makes the cure work — pull the foreign commit into the feature branch and the refusal clears. The second covers a rebase that resolved a conflict, which rewrites patch ids and would otherwise make our own superseded commits look like someone else's. When something is genuinely foreign, nothing is published at all — not that branch, not the others, not `fork/main`.
 
 ## Note on `node:child_process`
 

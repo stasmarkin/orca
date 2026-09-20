@@ -12,7 +12,11 @@
 
 install_dir := env_var('HOME') / '.orca-local-install'
 backup_app := install_dir / 'Orca-previous.app'
+# The signed release, kept from the first install only: after that every backup is a local build,
+# and without this copy there is no way back to a notarized app except a fresh download.
+original_app := install_dir / 'Orca-original.app'
 install_log := install_dir / 'install.log'
+build_ref := 'refs/fork-sync/build'
 
 [private]
 default:
@@ -26,12 +30,46 @@ build:
       echo "just build targets macOS; use pnpm build:linux elsewhere." >&2
       exit 1
     fi
-    pnpm install
+    # Why not plain `pnpm install`: build:mac packages x64 and arm64, and a host-only install
+    # makes electron-builder's beforePack guard fail on the slice whose natives are missing.
+    pnpm install:release
     pnpm build:mac
     echo "Built: $(just _built-app)"
 
 # Build the current working tree and install it over /Applications/Orca.app.
-install: build swap
+# `just install any-tree` installs a tree that is not the rebuilt fork main.
+install force="": (_assert-build-tree force) build swap
+
+# What just sync rebuilt is the only tree that carries every feature; a checkout sitting on one
+# feature branch builds an app missing the rest, and nothing about the result says so.
+[private]
+_assert-build-tree force:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Positional and spelled exactly, not `force=yes`: just reads that form as the argument's value,
+    # so the override silently did nothing — and a typo must not be what disables the check.
+    if [[ -n "{{ force }}" ]]; then
+      if [[ "{{ force }}" != "any-tree" ]]; then
+        echo "Unknown argument \"{{ force }}\". To install this tree anyway: just install any-tree" >&2
+        exit 1
+      fi
+      echo "any-tree: installing this tree, whatever it holds."
+      exit 0
+    fi
+    built="$(git rev-parse --verify --quiet {{ build_ref }} || true)"
+    if [[ -z "$built" ]]; then
+      echo "No build recorded at {{ build_ref }}. Run: just sync (or: just install any-tree)" >&2
+      exit 1
+    fi
+    if [[ "$(git rev-parse HEAD)" != "$built" ]]; then
+      echo "This tree is $(git rev-parse --abbrev-ref HEAD), not the fork main just sync rebuilt." >&2
+      echo "Installing it would ship only the features on this branch." >&2
+      echo "Build from the sync output:" >&2
+      echo "  git worktree add --detach /tmp/orca-build {{ build_ref }}" >&2
+      echo "  cd /tmp/orca-build && just install" >&2
+      echo "Or override: just install any-tree" >&2
+      exit 1
+    fi
 
 # Install the most recent build without rebuilding.
 swap:
@@ -43,7 +81,16 @@ swap:
     cat > "$installer" <<'INSTALLER'
     #!/usr/bin/env bash
     set -euo pipefail
-    src="$1"; dest="/Applications/Orca.app"; backup="$2"; staged="/Applications/.Orca.app.incoming"
+    src="$1"; dest="/Applications/Orca.app"; backup="$2"; original="$3"
+    staged="/Applications/.Orca.app.incoming"
+    # Gatekeeper, because only a notarized app passes it: "not ad-hoc" would also accept an unsigned
+    # slice or one signed with a Developer ID found in the keychain, and either would spend the only
+    # slot for the release on a copy of what we are replacing. Version cannot tell them apart —
+    # this justfile does not stamp one.
+    if [ ! -d "$original" ] && [ -d "$dest" ] && spctl -a -t exec "$dest" >/dev/null 2>&1; then
+      echo "[$(date '+%H:%M:%S')] keeping the signed release at $original"
+      ditto "$dest" "$original"
+    fi
     # Why stage first: the two moves below are the only window where /Applications has no Orca.app.
     # Copying straight over the destination would leave it half-written if this process is killed.
     echo "[$(date '+%H:%M:%S')] staging $src"
@@ -72,7 +119,7 @@ swap:
     echo "Orca will quit and reopen; this terminal goes with it."
     echo "Progress: tail -f {{ install_log }}"
     echo "Undo:     just revert"
-    nohup bash "$installer" "$src" "{{ backup_app }}" >"{{ install_log }}" 2>&1 &
+    nohup bash "$installer" "$src" "{{ backup_app }}" "{{ original_app }}" >"{{ install_log }}" 2>&1 &
     sleep 1
 
 # Restore the app this install replaced.
@@ -131,13 +178,25 @@ fork-check:
 fork-prs:
     @node .fork/sync.mjs prs
 
+# Files are named rather than the directory: node --test reads a dot-directory as a module path.
+# Tests for the sync tooling itself (the repo's vitest config does not cover .fork/).
+fork-test:
+    @node --test .fork/*.test.mjs
+
 [private]
 _built-app:
     #!/usr/bin/env bash
     set -euo pipefail
-    app="$(ls -dt dist/mac*/Orca.app 2>/dev/null | head -1 || true)"
-    if [[ -z "$app" || ! -x "$app/Contents/MacOS/Orca" ]]; then
-      echo "No built Orca.app under dist/. Run: just build" >&2
+    # Why not `ls -dt dist/mac*`: build:mac packages x64 and arm64, so the newest directory is
+    # whichever electron-builder finished last — on an Intel host that installs an arm64 bundle
+    # that will not launch, after the working app has already been moved to the backup.
+    case "$(uname -m)" in
+      arm64) app="dist/mac-arm64/Orca.app" ;;
+      x86_64) app="dist/mac/Orca.app" ;;
+      *) echo "Unsupported architecture $(uname -m)." >&2; exit 1 ;;
+    esac
+    if [[ ! -x "$app/Contents/MacOS/Orca" ]]; then
+      echo "No $(uname -m) build at $app. Run: just build" >&2
       exit 1
     fi
     printf '%s\n' "$(cd "$(dirname "$app")" && pwd)/$(basename "$app")"

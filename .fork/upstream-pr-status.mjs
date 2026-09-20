@@ -4,8 +4,14 @@ import { gh } from './git-commands.mjs'
 
 const UPSTREAM = 'stablyai/orca'
 
-/** @returns {Map<number, {state: string, headRefName: string, headRefOid: string, url: string, mergedAt: string | null}>} */
-export function readPullRequestStates() {
+const FIELDS = 'number,state,headRefName,headRefOid,url,mergedAt'
+
+/**
+ * @param {number[]} [wanted] pull requests the manifest names, fetched one by one if the listing
+ *   did not reach back far enough to include them
+ * @returns {Map<number, {state: string, headRefName: string, headRefOid: string, url: string, mergedAt: string | null}>}
+ */
+export function readPullRequestStates(wanted = []) {
   const raw = gh([
     'pr',
     'list',
@@ -18,11 +24,24 @@ export function readPullRequestStates() {
     '--limit',
     '100',
     '--json',
-    'number,state,headRefName,headRefOid,url,mergedAt'
+    FIELDS
   ])
   const byNumber = new Map()
   for (const pr of JSON.parse(raw)) {
     byNumber.set(pr.number, pr)
+  }
+  // The listing is newest-first, so an old still-open pull request falls off it once a hundred
+  // newer ones exist — and an unresolved number reads as "decide", which blocks every sync.
+  for (const number of wanted) {
+    if (byNumber.has(number)) {
+      continue
+    }
+    const one = gh(['pr', 'view', String(number), '--repo', UPSTREAM, '--json', FIELDS], {
+      allowFail: true
+    })
+    if (one !== null) {
+      byNumber.set(number, JSON.parse(one))
+    }
   }
   return byNumber
 }

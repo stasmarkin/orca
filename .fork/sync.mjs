@@ -12,9 +12,16 @@ import { countBehind, inspectDrift } from './sync-marker.mjs'
 import { rebaseFeatures } from './feature-rebase.mjs'
 import { rebuildForkMain } from './fork-main-rebuild.mjs'
 import { refreshPullRequests } from './pull-request-refresh.mjs'
+import { inspectPush } from './push-safety.mjs'
 
 const BASE = 'origin/main'
-const FORK_MAIN = 'fork/main'
+// Fully qualified: a local branch literally named fork/main would otherwise win the lookup and the
+// drift check would inspect it instead of what the fork has published.
+const FORK_REFS = 'refs/remotes/fork/'
+const FORK_MAIN = `${FORK_REFS}main`
+const PUBLISHED_REFS = 'refs/fork-sync/published/'
+const KNOWN_FLAGS = ['--dry-run', '--no-push', '--skip-verify', '--allow-drift']
+const UPSTREAM_SLUG = 'stablyai/orca'
 
 const [command = 'status', ...flags] = process.argv.slice(2)
 const dryRun = flags.includes('--dry-run')
@@ -30,6 +37,14 @@ try {
 }
 
 async function main() {
+  // A silently ignored typo in --dry-run would force-push for real.
+  const unknown = flags.filter((flag) => !KNOWN_FLAGS.includes(flag))
+  if (unknown.length > 0) {
+    throw new Error(`Unknown flag(s): ${unknown.join(', ')}. Expected ${KNOWN_FLAGS.join(', ')}.`)
+  }
+  // Before the first fetch, so a checkout wired to the wrong remotes is stopped rather than having
+  // its tracking refs rewritten from whatever `origin` turned out to be.
+  assertRemotes()
   switch (command) {
     case 'status':
       return status()
@@ -44,9 +59,64 @@ async function main() {
   }
 }
 
-function fetchRemotes() {
+function prNumbers(features) {
+  // A frozen feature is classified without ever consulting its pull request.
+  return features
+    .filter((feature) => feature.kind !== 'frozen')
+    .map((feature) => feature.pr)
+    .filter((pr) => pr !== null)
+}
+
+/**
+ * In this checkout `origin` is upstream and `fork` is mine — the reverse of the usual layout, and
+ * this tool force-pushes to one of them. In a plain clone of the fork, `origin` would be the fork:
+ * features would rebase onto their own published state and the rebuild would land in the open
+ * upstream pull requests. Cheap to check, unrecoverable to get wrong.
+ */
+function assertRemotes() {
+  const urlOf = (remote) =>
+    (git(['remote', 'get-url', remote], { allowFail: true }) ?? '').toLowerCase()
+  const origin = urlOf('origin')
+  const fork = urlOf('fork')
+  if (!origin.includes(UPSTREAM_SLUG)) {
+    throw new Error(
+      `origin must be ${UPSTREAM_SLUG} (the upstream), but it is "${origin || 'unset'}".`
+    )
+  }
+  if (fork === '' || fork.includes(UPSTREAM_SLUG)) {
+    throw new Error(
+      `fork must be your own fork, not ${UPSTREAM_SLUG}, but it is "${fork || 'unset'}".`
+    )
+  }
+}
+
+/**
+ * Named refspecs rather than whatever remote.fork.fetch happens to be: configured narrowly it leaves
+ * tracking refs this tool reads — fork main included — months out of date, and configured with a
+ * wildcard it drags in every branch the fork inherited from upstream, thousands of them.
+ * Unpublished branches are dropped first because a refspec naming one fails the whole fetch.
+ */
+function fetchFork(branches) {
+  const published = new Set(
+    // Asked by name: an unqualified listing returns every branch the fork inherited from upstream.
+    git(['ls-remote', '--heads', 'fork', ...branches.map((branch) => `refs/heads/${branch}`)])
+      .split('\n')
+      .map((line) => line.split('refs/heads/')[1])
+      .filter(Boolean)
+  )
+  const wanted = branches.filter((branch) => published.has(branch))
+  if (wanted.length > 0) {
+    git(['fetch', 'fork', ...wanted.map((branch) => `+refs/heads/${branch}:${FORK_REFS}${branch}`)])
+  }
+}
+
+function fetchRemotes(branches) {
   git(['fetch', 'origin', 'main'])
-  git(['fetch', 'fork'])
+  fetchFork(branches)
+}
+
+function trackedBranches(features) {
+  return ['main', ...features.map((feature) => feature.branch)]
 }
 
 /**
@@ -67,9 +137,9 @@ function enableRerere() {
 }
 
 function status() {
-  fetchRemotes()
   const features = readFeatures()
-  const states = readPullRequestStates()
+  fetchRemotes(trackedBranches(features))
+  const states = readPullRequestStates(prNumbers(features))
   const baseSha = resolve(BASE)
 
   console.log(`upstream ${BASE} at ${baseSha.slice(0, 10)}`)
@@ -79,14 +149,11 @@ function status() {
 
   const rows = features.map((feature) => {
     const { label, action } = classify(feature, states)
-    const behind = exists(feature.branch)
-      ? countCommits(git(['merge-base', feature.branch, BASE]), baseSha)
-      : 0
     return {
       id: feature.id,
       kind: feature.kind,
       upstream: label,
-      behind: feature.kind === 'frozen' ? `${behind} (frozen)` : String(behind),
+      behind: describeBehind(feature, baseSha),
       action
     }
   })
@@ -105,17 +172,32 @@ function status() {
   }
 }
 
+/** A branch missing locally must not read as "0 behind", which is what a fully current one shows. */
+function describeBehind(feature, baseSha) {
+  if (!exists(feature.branch)) {
+    return 'no branch'
+  }
+  const behind = countCommits(git(['merge-base', feature.branch, BASE]), baseSha)
+  return feature.kind === 'frozen' ? `${behind} (frozen)` : String(behind)
+}
+
 function check() {
-  const drift = inspectDrift(FORK_MAIN)
+  // The whole verdict is about what the fork holds; reading a stale remote-tracking ref could
+  // report clean while published fork main carries work nobody has moved into a branch.
+  fetchFork(['main'])
+  const drift = inspectDrift(FORK_MAIN, BASE)
   if (drift.state === 'clean') {
     console.log(`fork main is exactly the build recorded at ${drift.marker.slice(0, 10)}.`)
     return
   }
   if (drift.state === 'unmanaged') {
-    console.log(
-      'fork main carries no sync marker yet — the first sync will rebuild it from the manifest.'
-    )
-    console.log('Anything on fork main that is not in a manifest branch will be dropped.')
+    if (!exists(FORK_MAIN)) {
+      console.log('The fork has no main branch yet — the first sync builds it from the manifest.')
+      return
+    }
+    console.log('fork main carries no sync marker yet, so none of it is known to be reproducible.')
+    console.log(`Review what a rebuild would replace:  git log --oneline ${BASE}..${FORK_MAIN}`)
+    console.log('Each of those commits needs a manifest branch, then: just sync --allow-drift')
     return
   }
   console.log(`fork main has ${drift.extra.length} commit(s) on top of its sync marker:`)
@@ -128,14 +210,14 @@ function check() {
 }
 
 function sync() {
-  fetchRemotes()
+  const features = readFeatures()
+  fetchRemotes(trackedBranches(features))
   if (!dryRun) {
     enableRerere()
   }
 
-  const features = readFeatures()
   assertBranchesExist(features)
-  const states = readPullRequestStates()
+  const states = readPullRequestStates(prNumbers(features))
 
   const blocked = features
     .map((feature) => ({ feature, ...classify(feature, states) }))
@@ -149,14 +231,25 @@ function sync() {
     )
   }
 
-  const drift = inspectDrift(FORK_MAIN)
-  if (drift.state === 'drifted' && !allowDrift) {
+  const drift = inspectDrift(FORK_MAIN, BASE)
+  if (!allowDrift && drift.state === 'drifted') {
     throw new Error(
       `fork main has ${drift.extra.length} commit(s) not in any manifest branch:\n${drift.extra
         .map((line) => `  ${line}`)
         .join(
           '\n'
         )}\n\nRebuilding drops them. Move them into feature branches, or pass --allow-drift to discard.`
+    )
+  }
+  // Without a marker nothing on fork main is known to come from the manifest, so this is the case
+  // with the most to lose — it must not be the one that skips the guard a few extra commits get.
+  if (!allowDrift && drift.state === 'unmanaged' && exists(FORK_MAIN)) {
+    throw new Error(
+      `fork main carries no sync marker, so none of it is known to come from the manifest.\n` +
+        `Rebuilding replaces it wholesale and force-pushes the result. See what would go:\n` +
+        `  git log --oneline ${BASE}..${FORK_MAIN}\n\n` +
+        `Every one of those commits must live in a manifest branch, or it is gone. ` +
+        `Then: --allow-drift`
     )
   }
 
@@ -193,28 +286,97 @@ function sync() {
   prs()
 }
 
+/**
+ * Publishes by comparing against what the fork already holds, not by whether this run rebased:
+ * a branch upstream has not moved past keeps state 'current' while still carrying commits — a review
+ * fix pushed to nothing — and the pull request would sit on stale code with the sync reporting success.
+ *
+ * One atomic push for everything: published piecemeal, a lease that fails halfway leaves the fork
+ * holding some branches from this build and some from the last one.
+ */
 function pushEverything(rebased, built) {
-  for (const row of rebased) {
-    if (row.state !== 'rebased') {
-      continue
-    }
-    const remote = `fork/${row.branch}`
-    const lease = exists(remote)
-      ? `--force-with-lease=${row.branch}:${resolve(remote)}`
-      : '--force-with-lease'
-    git(['push', lease, 'fork', `${row.after}:refs/heads/${row.branch}`])
-    console.log(`pushed ${row.branch}`)
+  const decided = [
+    ...rebased.map((row) => ({
+      branch: row.branch,
+      sha: row.after,
+      baseline: lastPublished(row.branch) ?? row.before,
+      remoteRef: `${FORK_REFS}${row.branch}`
+    })),
+    { branch: 'main', sha: built.sha, baseline: null, remoteRef: FORK_MAIN }
+  ].map((target) => ({
+    ...target,
+    ...inspectPush(
+      {
+        sha: target.sha,
+        remoteSha: exists(target.remoteRef) ? resolve(target.remoteRef) : null,
+        baseline: target.baseline
+      },
+      countUnseen
+    )
+  }))
+
+  const refused = decided.filter((target) => target.action === 'refuse')
+  if (refused.length > 0) {
+    const lines = refused.map(
+      (target) =>
+        `  fork/${target.branch}: ${target.unseen} commit(s) this checkout has no counterpart for\n` +
+        `    git log --oneline --cherry-pick --right-only ${target.sha}...${target.remoteRef}`
+    )
+    throw new Error(
+      `Nothing was published. The fork holds work this sync would discard:\n${lines.join('\n')}\n\n` +
+        `Most likely someone else's commit — a suggestion applied in the pull request UI, a push from\n` +
+        `another machine. Bring it into the feature branch, then sync again.\n` +
+        `If you have read the list and it is genuinely expendable, publish by hand and tell this tool\n` +
+        `what the fork now holds, or it will refuse again:\n` +
+        `  git push --force fork <sha>:refs/heads/<branch>\n` +
+        `  git update-ref ${PUBLISHED_REFS}<branch> <sha>`
+    )
   }
-  const mainLease = exists(FORK_MAIN)
-    ? `--force-with-lease=main:${resolve(FORK_MAIN)}`
-    : '--force-with-lease'
-  git(['push', mainLease, 'fork', `${built.sha}:refs/heads/main`])
-  console.log('pushed fork main')
+
+  const pushing = decided.filter((target) => target.action !== 'skip')
+  if (pushing.length === 0) {
+    console.log('The fork already holds this build; nothing to push.')
+    return
+  }
+  // Leases are spelt out rather than bare: a bare lease trusts the remote-tracking ref, which a
+  // background fetch can refresh to whatever someone else just pushed, defeating the check.
+  const leases = pushing
+    .filter((target) => target.lease !== undefined)
+    .map((target) => `--force-with-lease=${target.branch}:${target.lease}`)
+  git([
+    'push',
+    '--atomic',
+    ...leases,
+    'fork',
+    ...pushing.map((target) => `${target.sha}:refs/heads/${target.branch}`)
+  ])
+  for (const target of pushing) {
+    git(['update-ref', `${PUBLISHED_REFS}${target.branch}`, target.sha])
+  }
+  console.log(`pushed ${pushing.map((target) => target.branch).join(', ')}`)
+}
+
+/**
+ * What this tool last put in the fork, which is not the same as the branch's sha before this sync:
+ * a run that rebased and then stopped short of publishing — --no-push, a failed typecheck, a conflict
+ * on a later branch — leaves the local branch rewritten while the fork still holds the old history.
+ * Comparing against the pre-rebase sha then counts our own superseded commits as foreign work.
+ */
+function lastPublished(branch) {
+  const ref = `${PUBLISHED_REFS}${branch}`
+  return exists(ref) ? resolve(ref) : null
+}
+
+/** Commits on the right that have no patch-equivalent on the left; rebased copies do not count. */
+function countUnseen(baseline, remoteSha) {
+  return Number(
+    git(['rev-list', '--count', '--right-only', '--cherry-pick', `${baseline}...${remoteSha}`])
+  )
 }
 
 function prs() {
   const features = readFeatures()
-  const states = readPullRequestStates()
+  const states = readPullRequestStates(prNumbers(features))
   const open = features.filter(
     (feature) => feature.pr !== null && states.get(feature.pr)?.state === 'OPEN'
   )

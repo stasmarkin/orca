@@ -10,18 +10,18 @@ const MANIFEST_PATH = `${repoRoot()}.fork/features.yaml`
 
 /** @typedef {{id: string, branch: string, pr: number | null, kind: string, since: string, why: string}} Feature */
 
-/** @returns {Feature[]} */
-export function readFeatures() {
-  const raw = parse(readFileSync(MANIFEST_PATH, 'utf8'))
+/** @param {string} [path] @returns {Feature[]} */
+export function readFeatures(path = MANIFEST_PATH) {
+  const raw = parse(readFileSync(path, 'utf8'))
   const list = raw?.features
   if (!Array.isArray(list) || list.length === 0) {
-    throw new Error(`${MANIFEST_PATH}: expected a non-empty "features" list`)
+    throw new Error(`${path}: expected a non-empty "features" list`)
   }
 
   const seenIds = new Set()
   const seenBranches = new Set()
   return list.map((entry, index) => {
-    const at = `${MANIFEST_PATH}: features[${index}]`
+    const at = `${path}: features[${index}]`
     const feature = {
       id: requireString(entry?.id, `${at}.id`),
       branch: requireString(entry?.branch, `${at}.branch`),
