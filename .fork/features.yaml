@@ -48,7 +48,7 @@ features:
 
   - id: cli-repo-add-folder
     branch: feat/cli-repo-add-folder
-    pr: null
+    pr: 21730
     kind: upstream
     since: 2026-09-19
     why: >
