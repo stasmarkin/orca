@@ -71,6 +71,12 @@ Everything goes out in one atomic push, so a lease that fails cannot leave the f
 
 The obvious check — "is the remote ahead of me" — is dead exactly when a rebase happened, which is every sync: a rebased branch always carries commits the remote has never seen. `--force-with-lease` does not help either, because the lease is taken from the ref this sync just fetched, so it is satisfied by the very commit that would be lost.
 
+The first sync of a branch the fork already carries from before this tooling existed will usually refuse, and that is working as intended: there is no record of what was published, and a rebase across a few hundred upstream commits changes patch ids enough that the old copy no longer matches. Read the listed commits, confirm they are your own, then register what the fork holds and sync again:
+
+```bash
+git update-ref refs/fork-sync/published/<branch> $(git rev-parse refs/remotes/fork/<branch>)
+```
+
 So commits are matched **by patch id, not by sha**. A commit on the fork counts as foreign only when nothing on either side we know about carries the same patch: neither the branch about to be published, nor `refs/fork-sync/published/<branch>`, which records what this tool last pushed. The first side makes the cure work — pull the foreign commit into the feature branch and the refusal clears. The second covers a rebase that resolved a conflict, which rewrites patch ids and would otherwise make our own superseded commits look like someone else's. When something is genuinely foreign, nothing is published at all — not that branch, not the others, not `fork/main`.
 
 ## Note on `node:child_process`
