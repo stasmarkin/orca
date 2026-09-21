@@ -7,7 +7,7 @@
 # kind:
 #   upstream   offered to stablyai/orca; merged into fork main and force-pushed on every sync
 #   fork-only  never offered upstream; merged last so it cannot ride along in a pull request diff
-#   frozen     documented but left out of the build — too far behind upstream to replay as-is
+#   frozen     documented but deliberately left out of the build; `why` records what reviving costs
 
 features:
   - id: auto-hide-single-tab-strip

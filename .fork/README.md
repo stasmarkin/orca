@@ -25,7 +25,7 @@ Flags, all passed through by `just sync`: `--no-push` stops after the rebuild, `
 Two side effects worth knowing about, both deliberate:
 
 - `just sync` sets `rerere.enabled` and `rerere.autoUpdate` for this repository, which changes **all** manual merges here, not only the rebuild: a conflict you have resolved once is replayed and staged for you.
-- Each rebuild is recorded at `refs/fork-sync/build`, which is also what keeps the commit from being garbage-collected once the scratch worktree is gone. `just install` refuses to install a tree that is not that build (`force=yes` overrides), because a checkout sitting on one feature branch builds an app missing every other feature, and nothing about the result says so.
+- Each rebuild is recorded at `refs/fork-sync/build`, which is also what keeps the commit from being garbage-collected once the scratch worktree is gone. `just install` refuses to install a tree that is not that build (`just install any-tree` overrides), because a checkout sitting on one feature branch builds an app missing every other feature, and nothing about the result says so.
 
 ## Why it refuses to run on a merged feature
 
@@ -63,7 +63,7 @@ A `fork/main` with **no marker at all** — one built by hand before this toolin
 
 ## Frozen features
 
-`kind: frozen` documents a branch that is too far behind to replay — the Arcadia stack sits 600+ commits back, across an upstream source-control refactor, so reviving it is a rewrite rather than a rebase. It stays in the manifest for the record and out of the build.
+`kind: frozen` documents a branch that is deliberately left out of the build — not one that cannot be replayed. The Arcadia stack is the current example: it sits hundreds of commits back, but a trial merge (`git merge-tree --write-tree --name-only origin/main <branch>`) conflicts in 19 files, so reviving it is an afternoon of work rather than a rewrite. Measure before freezing, and record the number: "too far behind" guessed from a commit count is how the entry got written wrong the first time.
 
 ## What the publish step refuses to do
 

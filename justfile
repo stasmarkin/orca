@@ -83,11 +83,13 @@ swap:
     set -euo pipefail
     src="$1"; dest="/Applications/Orca.app"; backup="$2"; original="$3"
     staged="/Applications/.Orca.app.incoming"
-    # Gatekeeper, because only a notarized app passes it: "not ad-hoc" would also accept an unsigned
-    # slice or one signed with a Developer ID found in the keychain, and either would spend the only
-    # slot for the release on a copy of what we are replacing. Version cannot tell them apart —
-    # this justfile does not stamp one.
-    if [ ! -d "$original" ] && [ -d "$dest" ] && spctl -a -t exec "$dest" >/dev/null 2>&1; then
+    # Both checks, because either alone is satisfiable by a local build: spctl passes anything while
+    # Gatekeeper is disabled machine-wide, and a Developer ID in the keychain would be picked up by
+    # electron-builder. Together they mean a signed, notarization-accepted release. Version cannot
+    # tell them apart — this justfile does not stamp one.
+    if [ ! -d "$original" ] && [ -d "$dest" ] &&
+       codesign -dv "$dest" 2>&1 | grep -q '^Authority=Developer ID Application' &&
+       spctl -a -t exec "$dest" >/dev/null 2>&1; then
       echo "[$(date '+%H:%M:%S')] keeping the signed release at $original"
       ditto "$dest" "$original"
     fi
