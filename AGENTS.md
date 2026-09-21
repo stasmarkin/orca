@@ -131,3 +131,7 @@ Source-control and review changes must consider GitLab and other supported git p
 ## GitHub CLI Usage
 
 Be mindful of the user's `gh` CLI API rate limit — batch requests where possible and avoid unnecessary calls. All code, commands, and scripts must be compatible with macOS, Linux, and Windows.
+
+## Fork Sync (this fork only)
+
+`fork/main` is an output, not a source: it is rebuilt from scratch on every sync, so a commit made directly to it is dropped. The source of truth is one branch per feature, each cut from `origin/main`, listed in `.fork/features.yaml` with why it exists and whether it goes upstream. Run `just sync`; read [`.fork/README.md`](./.fork/README.md) before changing any of it. This section and everything it names live on the `fork-only/tooling` branch and must never reach a pull request.
