@@ -1,0 +1,75 @@
+# What this fork adds on top of stablyai/orca. Source of truth for the sync tooling in .fork/.
+#
+# This file holds only what git and GitHub cannot answer: why a change exists and whether it is
+# meant to go upstream. It deliberately does NOT record what changed (that is the branch diff) or
+# whether a pull request landed (that is read from GitHub at sync time).
+#
+# kind:
+#   upstream   offered to stablyai/orca; merged into fork main and force-pushed on every sync
+#   fork-only  never offered upstream; merged last so it cannot ride along in a pull request diff
+#   frozen     documented but deliberately left out of the build; `why` records what reviving costs
+
+features:
+  - id: auto-hide-single-tab-strip
+    branch: feat/auto-hide-single-tab-strip
+    pr: 20168
+    kind: upstream
+    since: 2026-09-11
+    why: >
+      A pane holding one tab still spent a row of vertical pixels on a tab strip that offered no
+      choice. Reclaiming it matters most in split layouts, where every pane pays the same toll.
+
+  - id: cli-worktree-pin-flags
+    branch: feat/cli-worktree-pin-flags
+    pr: 20384
+    kind: upstream
+    since: 2026-09-12
+    why: >
+      Pinning was reachable only by mouse in the sidebar, so it could not be scripted or set from
+      a terminal alongside the other worktree settings.
+
+  - id: workspace-pin-shortcuts
+    branch: feat/workspace-pin-shortcuts
+    pr: 20385
+    kind: upstream
+    since: 2026-09-12
+    why: >
+      Same gap as the CLI flags, from the keyboard side: pin, unpin and toggle-pin had no bindable
+      action, and Cmd-J had no entry for the current workspace.
+
+  - id: collapsed-group-counts
+    branch: stasmarkin/show-number-or-workspaces
+    pr: null
+    kind: upstream
+    since: 2026-09-19
+    why: >
+      A collapsed group hid how many workspaces it held and whether any agent inside was waiting,
+      so collapsing a group meant losing the signal that something needed attention.
+
+  - id: cli-repo-add-folder
+    branch: feat/cli-repo-add-folder
+    pr: 21730
+    kind: upstream
+    since: 2026-09-19
+    why: >
+      `repo add` assumed a git repository, so folder projects had to be registered through the UI.
+
+  - id: local-install-tooling
+    branch: fork-only/tooling
+    pr: null
+    kind: fork-only
+    since: 2026-09-12
+    why: >
+      `just install` builds this tree and swaps it over /Applications/Orca.app, and .fork/ holds the
+      sync tooling itself. Upstream has no use for either, and both must stay out of PR diffs.
+
+  - id: arcadia-integration
+    branch: stasmarkin/arcadia-integration
+    pr: null
+    kind: frozen
+    since: 2026-09-12
+    why: >
+      Arcadia (internal Yandex monorepo) support: 40 commits over 513 files, built as a stack of
+      arcadia/* branches (p1-plugin, p1-phase-c, r4a-source-control-refactor, r5-review). Frozen by
+      decision, not by impossibility — a trial merge against upstream conflicts in 19 files
+      (18 content, 1 modify/delete), so reviving it is an afternoon, not a rewrite.
