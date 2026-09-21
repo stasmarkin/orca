@@ -16,6 +16,7 @@ import {
   type WorktreeGroupEntry
 } from './project-grouping'
 import { getFolderWorkspaceHostId } from '../../folder-workspace-host-id'
+import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import type { RenderableFolderWorkspace } from './folder-workspace-lanes'
 
 function getRepoHostId(repoId: string, repoMap: Map<string, Repo>): ExecutionHostId | null {
@@ -241,6 +242,31 @@ export function getLaneHostWorktreeIds(
     if (!idsByHost.has(hostId)) {
       idsByHost.set(hostId, [])
     }
+  }
+  return idsByHost
+}
+
+/**
+ * Host-scoped ids of everything a lane's count badge tallies.
+ *
+ * Unlike getLaneHostWorktreeIds this does carry folder-workspace ids: the badge counts
+ * workspaces, and a folder workspace can hold an agent that needs the user.
+ */
+export function getLaneHostCountedWorkspaceIds(
+  worktrees: readonly Worktree[],
+  folderWorkspaces: readonly RenderableFolderWorkspace[],
+  repoMap: Map<string, Repo>,
+  defaultHostId: ExecutionHostId
+): Map<ExecutionHostId, string[]> | undefined {
+  if (worktrees.length === 0 && folderWorkspaces.length === 0) {
+    return undefined
+  }
+  const idsByHost = getHostWorktreeIds(worktrees, repoMap, defaultHostId) ?? new Map()
+  for (const { folderWorkspace, projectGroup } of folderWorkspaces) {
+    const hostId = getFolderWorkspaceHostId(folderWorkspace, projectGroup, defaultHostId)
+    const ids = idsByHost.get(hostId) ?? []
+    ids.push(folderWorkspaceKey(folderWorkspace.id))
+    idsByHost.set(hostId, ids)
   }
   return idsByHost
 }

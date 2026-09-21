@@ -28,6 +28,11 @@ import { EMPTY_PROJECT_GROUPS, type VirtualizedWorktreeViewportProps } from './v
 import { useWorktreeDropCommitContext } from '../drag/use-drop-commit-context'
 import { buildWorktreeVirtualRowContext } from './virtual-row-context'
 import { renderWorktreeVirtualRow } from '../rows/virtual-row-dispatch'
+import { useAttentionWorkspaceIds } from '../../use-attention-workspace-ids'
+import {
+  collapsedGroupCountBadgeNeedsAttention,
+  resolveCollapsedGroupCountBadgeMode
+} from '../../../../../../shared/collapsed-group-count-badge'
 
 const WORKTREE_SIDEBAR_SCROLL_STYLE: React.CSSProperties = {
   // Why: TanStack Virtual owns scroll correction; native overflow anchoring fights it and causes jumps.
@@ -59,6 +64,10 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
   const worktreeVisibilityDefaultsByHost = useAppStore((s) => s.worktreeVisibilityDefaultsByHost)
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
   const newCardStyle = settings?.experimentalNewWorktreeCardStyle === true
+  const countBadgeMode = resolveCollapsedGroupCountBadgeMode(settings)
+  const attentionWorkspaceIds = useAttentionWorkspaceIds(
+    collapsedGroupCountBadgeNeedsAttention(countBadgeMode)
+  )
 
   const reveal = useSidebarRevealHighlight()
   const scrollSuppression = useWorktreeSidebarScrollSuppression(scrollRef)
@@ -313,6 +322,8 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     nativeDrag,
     headerDrag,
     getCachedFolderWorkspacePathStatus,
+    countBadgeMode,
+    attentionWorkspaceIds,
     getLineageToggleHandler,
     toggleGroupWithScrollAnchor,
     onRowClickCapture: handleWorktreeRowClickCapture,

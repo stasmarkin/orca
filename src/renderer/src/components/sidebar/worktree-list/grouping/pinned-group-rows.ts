@@ -58,7 +58,10 @@ export function emitPinnedGroup(
     icon: PINNED_GROUP_META.icon,
     hostWorktreeCounts,
     hostWorktreeIds,
-    worktreeIds: pinnedSectionWorktrees.map((worktree) => worktree.id)
+    worktreeIds: pinnedSectionWorktrees.map((worktree) => worktree.id),
+    countedWorkspaceIds: pinnedSectionWorktrees.map((worktree) => worktree.id),
+    // The pinned section holds worktrees only, so its per-host slices are the same map.
+    hostCountedWorkspaceIds: hostWorktreeIds
   })
   if (collapsedGroups.has(PINNED_GROUP_KEY)) {
     for (const repoId of pinnedRepoOrder) {
