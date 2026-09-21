@@ -69,7 +69,7 @@ features:
     kind: frozen
     since: 2026-09-12
     why: >
-      Arcadia (internal Yandex monorepo) support, built as a stack of arcadia/* branches. Frozen at
-      643 commits behind upstream, across a source-control refactor — replaying it is a rewrite,
-      not a rebase. Companion branches: arcadia/p1-plugin, arcadia/p1-phase-c,
-      arcadia/r4a-source-control-refactor, arcadia/r5-review.
+      Arcadia (internal Yandex monorepo) support: 40 commits over 513 files, built as a stack of
+      arcadia/* branches (p1-plugin, p1-phase-c, r4a-source-control-refactor, r5-review). Frozen by
+      decision, not by impossibility — a trial merge against upstream conflicts in 19 files
+      (18 content, 1 modify/delete), so reviving it is an afternoon, not a rewrite.
