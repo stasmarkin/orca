@@ -33,6 +33,8 @@ build:
     # Why not plain `pnpm install`: build:mac packages x64 and arm64, and a host-only install
     # makes electron-builder's beforePack guard fail on the slice whose natives are missing.
     pnpm install:release
+    # mobile/ is its own pnpm workspace; build:mac bundles the mobile web app from mobile/node_modules.
+    pnpm --dir mobile install --frozen-lockfile
     pnpm build:mac
     echo "Built: $(just _built-app)"
 
