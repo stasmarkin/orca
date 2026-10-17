@@ -40,6 +40,7 @@ export type KeybindingActionId =
   | 'workspace.pin'
   | 'workspace.unpin'
   | 'workspace.togglePin'
+  | 'workspace.nextAttention'
   | 'voice.dictation'
   | 'view.tasks'
   | 'dashboard.toggle'
