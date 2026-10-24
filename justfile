@@ -35,7 +35,13 @@ build:
     fi
     # Exact quoted match: find-identity prints `<sha1> "<name>"`, and a prefix match would accept
     # "Orca Local Dev 2" — a different certificate, so a different requirement.
-    if ! security find-identity -v -p codesigning | grep -qF '"{{ sign_identity }}"'; then
+    sign_hashes="$(security find-identity -v -p codesigning | grep -F '"{{ sign_identity }}"' | awk '{print $2}' | sort -u || true)"
+    if [[ "$(printf '%s' "$sign_hashes" | grep -c . || true)" -gt 1 ]]; then
+      echo "Several valid identities are named \"{{ sign_identity }}\": $(echo $sign_hashes)." >&2
+      echo "Keep one in Keychain Access, or every build may pick a different one and break TCC grants." >&2
+      exit 1
+    fi
+    if [[ -z "$sign_hashes" ]]; then
       echo "No valid code-signing identity \"{{ sign_identity }}\" in the keychain." >&2
       echo "Without it the build would be ad-hoc, and macOS would ask for every permission again after install." >&2
       echo "Create it once (login keychain, self-signed, 10 years):" >&2
@@ -49,14 +55,31 @@ build:
       exit 1
     fi
     # electron-builder and the nested-helper signers in config/electron-builder.config.cjs all read
-    # CSC_NAME, so the app, its Helper apps and the terminal daemon host share one identity.
-    export CSC_NAME="{{ sign_identity }}"
+    # CSC_NAME, so the app, its Helper apps and the terminal daemon host share one identity. The
+    # hash, not the name: electron-builder matches CSC_NAME as a substring of find-identity lines.
+    export CSC_NAME="$sign_hashes"
+    # It would otherwise take precedence over CSC_NAME for the Computer Use helper.
+    unset ORCA_COMPUTER_MACOS_SIGN_IDENTITY
     # Why not plain `pnpm install`: build:mac packages x64 and arm64, and a host-only install
     # makes electron-builder's beforePack guard fail on the slice whose natives are missing.
     pnpm install:release
     # mobile/ is its own pnpm workspace; build:mac bundles the mobile web app from mobile/node_modules.
     pnpm --dir mobile install --frozen-lockfile
     pnpm build:mac
+    # Why: a local build does not force signing, so electron-builder falls back to ad-hoc silently.
+    requirement="certificate leaf = H\"$sign_hashes\""
+    for app in dist/mac/Orca.app dist/mac-arm64/Orca.app; do
+      [[ -d "$app" ]] || continue
+      for code in "$app" "$app"/Contents/Frameworks/*.app "$app"/Contents/Helpers/*.app \
+        "$app"/Contents/Resources/*.app "$app"/Contents/MacOS/*; do
+        [[ -e "$code" ]] || continue
+        if ! codesign --verify --strict -R="$requirement" "$code" 2>/dev/null; then
+          echo "$code is not signed by \"{{ sign_identity }}\" ($sign_hashes)." >&2
+          exit 1
+        fi
+      done
+      codesign --verify --deep --strict "$app"
+    done
     echo "Built: $(just _built-app)"
 
 # Build the current working tree and install it over /Applications/Orca.app.
