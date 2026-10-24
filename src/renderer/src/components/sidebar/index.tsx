@@ -104,6 +104,7 @@ function Sidebar({
     workspaceBoardRenderedOpen,
     workspaceBoardDragPreviewOpen,
     workspaceBoardMenuOpen,
+    workspaceBoardSearchFocusRequested,
     toggleWorkspaceBoard,
     handleWorkspaceBoardOpenChange,
     setWorkspaceBoardMenuOpen,
@@ -268,6 +269,7 @@ function Sidebar({
           statusBarVisible={statusBarVisible}
           dragPreview={workspaceBoardDragPreviewOpen}
           preserveOpenForMenu={workspaceBoardMenuOpen}
+          searchFocusRequested={workspaceBoardSearchFocusRequested}
           onOpenChange={handleWorkspaceBoardOpenChange}
           onMenuOpenChange={setWorkspaceBoardMenuOpen}
         />

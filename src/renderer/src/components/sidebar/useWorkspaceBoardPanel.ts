@@ -4,6 +4,7 @@ import { useAppStore } from '@/store'
 import { isXtermHelperTextarea } from '../terminal-pane/regular-terminal-focus-ownership'
 
 const WORKSPACE_BOARD_SHEET_SELECTOR = '[data-workspace-board-sheet]'
+const WORKSPACE_BOARD_SEARCH_SELECTOR = '[data-workspace-board-search]'
 
 // Document capture precedes React; let board text fields own Escape before dismissing the panel.
 function isWorkspaceBoardEditableTarget(target: EventTarget | null): boolean {
@@ -31,6 +32,7 @@ export type WorkspaceBoardPanelState = {
   workspaceBoardRenderedOpen: boolean
   workspaceBoardDragPreviewOpen: boolean
   workspaceBoardMenuOpen: boolean
+  workspaceBoardSearchFocusRequested: boolean
   openWorkspaceBoard: () => void
   closeWorkspaceBoard: () => void
   toggleWorkspaceBoard: () => void
@@ -45,8 +47,11 @@ export function useWorkspaceBoardPanel(): WorkspaceBoardPanelState {
   const [workspaceBoardOpen, setWorkspaceBoardOpen] = useState(false)
   const [workspaceBoardDragPreviewOpen, setWorkspaceBoardDragPreviewOpen] = useState(false)
   const [workspaceBoardMenuOpen, setWorkspaceBoardMenuOpen] = useState(false)
+  const [workspaceBoardSearchFocusRequested, setWorkspaceBoardSearchFocusRequested] =
+    useState(false)
   const workspaceBoardOpenRef = useRef(workspaceBoardOpen)
   const workspaceBoardDragPreviewOpenRef = useRef(workspaceBoardDragPreviewOpen)
+  const focusBeforeToggleOpenRef = useRef<HTMLElement | null>(null)
   workspaceBoardOpenRef.current = workspaceBoardOpen
   workspaceBoardDragPreviewOpenRef.current = workspaceBoardDragPreviewOpen
 
@@ -67,11 +72,25 @@ export function useWorkspaceBoardPanel(): WorkspaceBoardPanelState {
   }, [])
 
   const closeWorkspaceBoard = useCallback(() => {
+    const restoreFocusTarget = focusBeforeToggleOpenRef.current
+    focusBeforeToggleOpenRef.current = null
+    // Why: the search field unmounts on close and the non-modal sheet does not return focus;
+    // inactive worktrees stay mounted but hidden, so a connected target may still be invisible.
+    // The web client also runs on Safari < 17.4, which lacks checkVisibility; skip restoring there.
+    if (
+      restoreFocusTarget?.isConnected &&
+      typeof restoreFocusTarget.checkVisibility === 'function' &&
+      restoreFocusTarget.checkVisibility({ visibilityProperty: true }) &&
+      document.activeElement?.matches(WORKSPACE_BOARD_SEARCH_SELECTOR)
+    ) {
+      restoreFocusTarget.focus()
+    }
     workspaceBoardOpenRef.current = false
     workspaceBoardDragPreviewOpenRef.current = false
     setWorkspaceBoardOpen(false)
     setWorkspaceBoardDragPreviewOpen(false)
     setWorkspaceBoardMenuOpen(false)
+    setWorkspaceBoardSearchFocusRequested(false)
   }, [])
 
   const handleWorkspaceBoardOpenChange = useCallback(
@@ -90,7 +109,15 @@ export function useWorkspaceBoardPanel(): WorkspaceBoardPanelState {
       closeWorkspaceBoard()
       return
     }
+    // Why: a drag-hover open (or a toggle during its preview) must not pull focus mid-drag.
+    const dragging = workspaceBoardDragPreviewOpenRef.current
     openWorkspaceBoard()
+    if (dragging) {
+      return
+    }
+    focusBeforeToggleOpenRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    setWorkspaceBoardSearchFocusRequested(true)
   }, [closeWorkspaceBoard, openWorkspaceBoard])
 
   const previewWorkspaceBoardFromDrag = useCallback(() => {
@@ -166,6 +193,7 @@ export function useWorkspaceBoardPanel(): WorkspaceBoardPanelState {
     workspaceBoardRenderedOpen: workspaceBoardOpen || workspaceBoardDragPreviewOpen,
     workspaceBoardDragPreviewOpen: workspaceBoardDragPreviewOpen && !workspaceBoardOpen,
     workspaceBoardMenuOpen,
+    workspaceBoardSearchFocusRequested,
     openWorkspaceBoard,
     closeWorkspaceBoard,
     toggleWorkspaceBoard,
