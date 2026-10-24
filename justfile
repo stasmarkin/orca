@@ -17,6 +17,9 @@ backup_app := install_dir / 'Orca-previous.app'
 # and without this copy there is no way back to a notarized app except a fresh download.
 original_app := install_dir / 'Orca-original.app'
 install_log := install_dir / 'install.log'
+# Why a fixed self-signed identity, not ad-hoc: TCC pins a grant to the signature's designated
+# requirement, and ad-hoc pins it to a cdhash that changes with every build.
+sign_identity := 'Orca Local Dev'
 
 [private]
 default:
@@ -30,6 +33,24 @@ build:
       echo "just build targets macOS; use pnpm build:linux elsewhere." >&2
       exit 1
     fi
+    # Exact quoted match: find-identity prints `<sha1> "<name>"`, and a prefix match would accept
+    # "Orca Local Dev 2" — a different certificate, so a different requirement.
+    if ! security find-identity -v -p codesigning | grep -qF '"{{ sign_identity }}"'; then
+      echo "No valid code-signing identity \"{{ sign_identity }}\" in the keychain." >&2
+      echo "Without it the build would be ad-hoc, and macOS would ask for every permission again after install." >&2
+      echo "Create it once (login keychain, self-signed, 10 years):" >&2
+      echo "  d=\$(mktemp -d) && /usr/bin/openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj '/CN={{ sign_identity }}' \\" >&2
+      echo "    -addext 'extendedKeyUsage=critical,codeSigning' -addext 'keyUsage=critical,digitalSignature' \\" >&2
+      echo "    -keyout \$d/key.pem -out \$d/cert.pem \\" >&2
+      echo "  && /usr/bin/openssl pkcs12 -export -inkey \$d/key.pem -in \$d/cert.pem -name '{{ sign_identity }}' -out \$d/id.p12 -passout pass:tmp \\" >&2
+      echo "  && security import \$d/id.p12 -k ~/Library/Keychains/login.keychain-db -P tmp -T /usr/bin/codesign \\" >&2
+      echo "  && security add-trusted-cert -r trustRoot -p codeSign -k ~/Library/Keychains/login.keychain-db \$d/cert.pem \\" >&2
+      echo "  ; rm -rf \$d" >&2
+      exit 1
+    fi
+    # electron-builder and the nested-helper signers in config/electron-builder.config.cjs all read
+    # CSC_NAME, so the app, its Helper apps and the terminal daemon host share one identity.
+    export CSC_NAME="{{ sign_identity }}"
     # Why not plain `pnpm install`: build:mac packages x64 and arm64, and a host-only install
     # makes electron-builder's beforePack guard fail on the slice whose natives are missing.
     pnpm install:release
@@ -90,7 +111,7 @@ swap:
     echo "[$(date '+%H:%M:%S')] staging $src"
     rm -rf "$staged"
     ditto "$src" "$staged"
-    # Why: a locally built app is ad-hoc signed, and a stale quarantine flag would make Gatekeeper
+    # Why: a locally built app is not notarized, and a stale quarantine flag would make Gatekeeper
     # refuse it without the right-click dance on every install.
     xattr -dr com.apple.quarantine "$staged" 2>/dev/null || true
     echo "[$(date '+%H:%M:%S')] quitting Orca"
