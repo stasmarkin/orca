@@ -11,6 +11,7 @@ import { translate } from '@/i18n/i18n'
 type WorkspaceKanbanDrawerHeaderProps = {
   selectedCount: number
   query: string
+  searchFocusRequested: boolean
   isFiltering: boolean
   isTooLarge: boolean
   matchCount: number
@@ -33,6 +34,7 @@ type WorkspaceKanbanDrawerHeaderProps = {
 export default function WorkspaceKanbanDrawerHeader({
   selectedCount,
   query,
+  searchFocusRequested,
   isFiltering,
   isTooLarge,
   matchCount,
@@ -76,6 +78,7 @@ export default function WorkspaceKanbanDrawerHeader({
           </SheetTitle>
           <WorkspaceKanbanSearchField
             query={query}
+            focusRequested={searchFocusRequested}
             isFiltering={isFiltering}
             isTooLarge={isTooLarge}
             matchCount={matchCount}

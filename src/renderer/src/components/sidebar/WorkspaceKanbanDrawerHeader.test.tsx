@@ -57,6 +57,7 @@ function renderHeader(
   return WorkspaceKanbanDrawerHeader({
     selectedCount: 0,
     query: '',
+    searchFocusRequested: false,
     isFiltering: false,
     isTooLarge: false,
     matchCount: 0,
