@@ -13,6 +13,7 @@ const MAX_OVERLAY_RESERVE = '55%'
 
 type WorkspaceKanbanSearchFieldProps = {
   query: string
+  focusRequested: boolean
   /** False for text that never narrows the board (whitespace-only, over-bound). */
   isFiltering: boolean
   /** True when the text was discarded for length, which needs saying out loud. */
@@ -48,6 +49,7 @@ function formatAnnouncement(matchCount: number, totalCount: number): string {
 
 export default function WorkspaceKanbanSearchField({
   query,
+  focusRequested,
   isFiltering,
   isTooLarge,
   matchCount,
@@ -72,6 +74,13 @@ export default function WorkspaceKanbanSearchField({
     : null
   const badgeText = tooLargeLabel ?? counterText
 
+  // Focus in an effect, not autoFocus: the drawer stays mounted through its close linger, so a quick reopen must refocus too.
+  useEffect(() => {
+    if (focusRequested) {
+      inputRef.current?.focus()
+    }
+  }, [focusRequested])
+
   // Debounce announcements, not filtering, to avoid continuous per-keystroke screen-reader speech.
   useEffect(() => {
     if (tooLargeMessage) {
@@ -94,6 +103,7 @@ export default function WorkspaceKanbanSearchField({
       <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
         ref={inputRef}
+        data-workspace-board-search=""
         value={query}
         aria-label={translate(
           'auto.components.sidebar.WorkspaceKanbanSearchField.c0cd6bdf6c',
