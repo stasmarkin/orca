@@ -242,11 +242,11 @@ describe('sidebar list parity: desktop window and feed reader', () => {
     ],
     'open folder workspace': [
       parityActiveState('folder:fw-remote', 'ssh:gpu-vm'),
-      /^FOLDER folder-workspace:ssh:gpu-vm\|folder:fw-remote .* ACTIVE$/
+      /^FOLDER \S*folder-workspace:ssh:gpu-vm\|folder:fw-remote .* ACTIVE$/
     ],
     'open server folder workspace': [
       parityActiveState('folder:fw-server', 'runtime:env-1'),
-      /^FOLDER folder-workspace:runtime:env-1\|folder:fw-server group=pg-server-folders .* ACTIVE$/
+      /^FOLDER \S*folder-workspace:runtime:env-1\|folder:fw-server group=pg-server-folders .* ACTIVE$/
     ],
     'hide CLI-created': [
       { hideCliCreatedWorkspaces: true },

@@ -13,13 +13,19 @@ import {
   composeWorktreeHostIdentity,
   getExecutionHostIdFromWorktreeHostIdentity
 } from '../../../../../../shared/worktree/host-qualified-identity'
-import { getProjectGroupHeaderKey } from '../../../../../../shared/sidebar-list/group-keys'
+import {
+  PINNED_GROUP_KEY,
+  getProjectGroupHeaderKey
+} from '../../../../../../shared/sidebar-list/group-keys'
 import {
   getRepoExecutionHostId,
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
 import { getFolderWorkspaceLaneKey } from '../../../../../../shared/sidebar-list/folder-workspace-lanes'
-import type { WorktreeGroupBy } from '../../../../../../shared/sidebar-list/row-types'
+import type {
+  PinnedWorktreeDisplayPolicy,
+  WorktreeGroupBy
+} from '../../../../../../shared/sidebar-list/row-types'
 import { getFolderWorkspaceHostId } from '../../../../../../shared/sidebar-list/folder-workspace-host-id'
 import { getHostSectionCollapseKey } from '../../../../../../shared/sidebar-list/host-section-collapse'
 
@@ -92,6 +98,7 @@ export function getFolderWorkspaceRevealGroupKeys(
     defaultHostId?: ExecutionHostId
     hostScopedGroups?: boolean
     executionHostId?: ExecutionHostId
+    pinnedDisplayPolicy?: PinnedWorktreeDisplayPolicy
   }
 ): string[] {
   const folderWorkspace = findFolderWorkspaceByKey(
@@ -111,6 +118,19 @@ export function getFolderWorkspaceRevealGroupKeys(
       )
       .map((group) => [group.id, group])
   )
+  const owningGroup = groupsById.get(folderWorkspace.projectGroupId)
+  const hostId =
+    owningGroup && options?.defaultHostId
+      ? getFolderWorkspaceHostId(folderWorkspace, owningGroup, options.defaultHostId)
+      : undefined
+  const scopeLaneKey = (key: string): string =>
+    options?.hostScopedGroups && hostId ? getHostSectionCollapseKey(key, hostId) : key
+  // The host section wraps every lane, so it is expanded either way.
+  const hostKeys = hostId ? [`host:${hostId}`] : []
+  // Pinned-only rows live solely in Pinned; expanding their project group would persist a stray un-collapse.
+  if (folderWorkspace.isPinned && options?.pinnedDisplayPolicy !== 'duplicate-in-groups') {
+    return [scopeLaneKey(PINNED_GROUP_KEY), ...hostKeys]
+  }
   // Resolve parents from the unfiltered last same-ID group copy, matching the hostless headers the sidebar renders.
   const renderedGroupsById = new Map(projectGroups.map((group) => [group.id, group]))
   const keys: string[] = []
@@ -129,26 +149,17 @@ export function getFolderWorkspaceRevealGroupKeys(
   }
 
   // Non-repo modes hide folders behind lane/host headers; derive their reveal keys from the grouping function.
-  const owningGroup = groupsById.get(folderWorkspace.projectGroupId)
   if (options?.groupBy && options.groupBy !== 'repo' && owningGroup) {
-    const laneKey = getFolderWorkspaceLaneKey(
-      { folderWorkspace, projectGroup: owningGroup },
-      options.groupBy,
-      options.workspaceStatuses ?? []
-    )
     keys.push(
-      options.hostScopedGroups && options.defaultHostId
-        ? getHostSectionCollapseKey(
-            laneKey,
-            getFolderWorkspaceHostId(folderWorkspace, owningGroup, options.defaultHostId)
-          )
-        : laneKey
+      scopeLaneKey(
+        getFolderWorkspaceLaneKey(
+          { folderWorkspace, projectGroup: owningGroup },
+          options.groupBy,
+          options.workspaceStatuses ?? []
+        )
+      )
     )
   }
-  if (owningGroup && options?.defaultHostId) {
-    keys.push(
-      `host:${getFolderWorkspaceHostId(folderWorkspace, owningGroup, options.defaultHostId)}`
-    )
-  }
+  keys.push(...hostKeys)
   return keys
 }

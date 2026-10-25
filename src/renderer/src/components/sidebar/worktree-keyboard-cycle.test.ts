@@ -12,7 +12,8 @@ import {
 
 const folderRow: FolderWorkspaceRow = {
   type: 'folder-workspace',
-  key: 'folder-workspace:folder-1',
+  key: 'project-group:group-1:folder-workspace:local|folder:folder-1',
+  sectionKey: 'project-group:group-1',
   folderWorkspace: {
     id: 'folder-1',
     projectGroupId: 'group-1',
@@ -181,6 +182,28 @@ describe('getCyclableWorktreeIds', () => {
       'dup',
       'b'
     ])
+  })
+
+  it('counts a duplicated pinned folder workspace once, at its natural position', () => {
+    const pinnedFolder = {
+      ...folderRow,
+      folderWorkspace: { ...folderRow.folderWorkspace, isPinned: true }
+    }
+    const rows = [
+      {
+        ...pinnedFolder,
+        key: 'pinned:folder-workspace:local|folder:folder-1',
+        sectionKey: 'pinned'
+      },
+      worktree('after-pinned'),
+      pinnedFolder
+    ]
+
+    expect(getCyclableWorktreeIds(rows, 'duplicate-in-groups')).toEqual([
+      'after-pinned',
+      'folder:folder-1'
+    ])
+    expect(getCyclableWorktreeRows(rows, 'duplicate-in-groups')[1].rowKey).toBe(pinnedFolder.key)
   })
 
   it('keeps folder keys distinct from git ids and preserves same-id host ownership', () => {
