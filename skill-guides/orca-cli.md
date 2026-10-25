@@ -93,6 +93,7 @@ ORCA worktree set --worktree id:<repoId>::<worktreePath> --display-name "My Task
 ORCA worktree set --worktree active --comment "reproduced bug; testing fix" --json
 ORCA worktree set --worktree active --workspace-status in-review --json
 ORCA worktree set --worktree active --unread --json
+ORCA worktree set --worktree folder:<folderId> --comment "waiting on review" --json
 ORCA worktree set --worktree id:<repoId>::<worktreePath> --parent-worktree id:<parentRepoId>::<parentPath> --json
 ORCA worktree set --worktree id:<repoId>::<worktreePath> --no-parent --json
 ORCA worktree set --worktree active --pin --json
@@ -124,6 +125,7 @@ Lineage rules:
 - Use `--no-parent` only when the new work is independent.
 - A parent can be in a different project from its child, such as `worktree create --repo id:<otherRepoId> --name related-task --parent-worktree id:<parentRepoId>::<parentPath>`. A worktree parent and child must use the same execution host (local machine, SSH target, or paired server).
 - To move an existing worktree under a different parent, or make it top-level, use `worktree set` with `--parent-worktree <selector>` or `--no-parent`.
+- `worktree set` also updates folder workspaces: pass `folder:<folderId>`, or `active` from a folder with no enclosing worktree (local CLI only). Folders accept `--display-name`, `--comment`, `--workspace-status`, `--unread`/`--read`, and `--pin`/`--unpin`; link issues and reviews with `reference add`.
 - `--no-parent` only controls Orca lineage; it does not choose the Git base. For independent top-level work, omit `--base-branch` so Orca uses the repo default base, or explicitly pass the repo default base. Never base it on the current feature branch unless the user asks for stacked work or "branch from current".
 - If `--repo` is omitted, Orca infers the repo from the current Orca worktree when possible.
 

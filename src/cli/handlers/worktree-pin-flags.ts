@@ -17,9 +17,11 @@ export function getOptionalPinFlag(flags: Map<string, string | boolean>): boolea
   return pin || unpin ? pin : undefined
 }
 
-export function getWorktreeStateFlags(flags: Map<string, string | boolean>): {
+export type WorktreeStateFlags = {
   isUnread: boolean | undefined
   isPinned: boolean | undefined
-} {
+}
+
+export function getWorktreeStateFlags(flags: Map<string, string | boolean>): WorktreeStateFlags {
   return { isUnread: getOptionalWorktreeUnreadFlag(flags), isPinned: getOptionalPinFlag(flags) }
 }
