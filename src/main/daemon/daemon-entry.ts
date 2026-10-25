@@ -25,6 +25,7 @@ import { startDaemonScopeDeathWatch } from './daemon-scope-death-watch'
 import { isWindowsProcessTableAvailable } from '../windows/windows-process-table'
 import { leaseAppImageGenerationForCurrentProcess } from '../cli/appimage-generation-lease'
 import { createDaemonShutdownDeadline } from './daemon-shutdown-deadline'
+import { createDaemonProcessExit } from './daemon-process-exit'
 
 export type ParsedDaemonArgs = {
   socketPath: string
@@ -164,7 +165,8 @@ async function main(): Promise<void> {
   let daemon: DaemonHandle | null = null
   let deathWatch: MacosLoginSessionDeathWatch | null = null
   let shuttingDown = false
-  const shutdownDeadline = createDaemonShutdownDeadline(daemonLog, () => daemon)
+  const { exit: exitDaemon, exitNow, prime } = createDaemonProcessExit(daemonLog)
+  const shutdownDeadline = createDaemonShutdownDeadline(daemonLog, () => daemon, exitNow, prime)
   const beginShutdown = (): void => {
     shuttingDown = true
     shutdownDeadline.start()
@@ -188,7 +190,7 @@ async function main(): Promise<void> {
       daemonLog.log('shutdown-error', { message: (err as Error)?.message })
     } finally {
       shutdownDeadline.cancel()
-      process.exit(0)
+      await exitDaemon(0)
     }
   }
 
@@ -243,7 +245,7 @@ async function main(): Promise<void> {
             daemonLog.log('login-session-dead-retire', details)
             daemon?.recordOrderlyExit()
             // Skip PTY teardown so replacement daemons cold-restore scrollback from unclean session metadata.
-            process.exit(1)
+            void exitDaemon(1)
           }
         })
       : null
@@ -294,11 +296,11 @@ async function main(): Promise<void> {
       deathWatch?.stop()
       shuttingDown = true
       daemonLog.log('shutdown', { reason: 'idle' })
-      process.exit(0)
+      void exitDaemon(0)
     },
     onRpcShutdown: () => {
       shutdownDeadline.cancel()
-      process.exit(0)
+      void exitDaemon(0)
     },
     onShutdownRequested: beginShutdown
   })
