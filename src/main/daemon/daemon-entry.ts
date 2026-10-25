@@ -24,6 +24,7 @@ import { startDaemonScopeDeathWatch } from './daemon-scope-death-watch'
 import { isWindowsProcessTableAvailable } from '../windows/windows-process-table'
 import { leaseAppImageGenerationForCurrentProcess } from '../cli/appimage-generation-lease'
 import { createDaemonShutdownDeadline } from './daemon-shutdown-deadline'
+import { createDaemonProcessExit } from './daemon-process-exit'
 
 export type ParsedDaemonArgs = {
   socketPath: string
@@ -159,10 +160,12 @@ async function main(): Promise<void> {
   let daemon: DaemonHandle | null = null
   let deathWatch: MacosLoginSessionDeathWatch | null = null
   let shuttingDown = false
-  const shutdownDeadline = createDaemonShutdownDeadline(daemonLog, () => process.exit(0))
+  const processExit = createDaemonProcessExit(daemonLog)
+  const shutdownDeadline = createDaemonShutdownDeadline(daemonLog, () => processExit.exitNow(0))
   const beginShutdown = (): void => {
     shuttingDown = true
     shutdownDeadline.start()
+    void processExit.prime()
     // Mark the stop before teardown: losing the AppImage mount to scope shutdown can interrupt it with SIGBUS.
     daemon?.recordStopRequested()
     deathWatch?.stop()
@@ -183,8 +186,7 @@ async function main(): Promise<void> {
       daemonLog.log('shutdown-error', { message: (err as Error)?.message })
     } finally {
       shutdownDeadline.cancel()
-      daemonLog.close()
-      process.exit(0)
+      await processExit.exit(0)
     }
   }
 
@@ -238,9 +240,8 @@ async function main(): Promise<void> {
             shuttingDown = true
             daemonLog.log('login-session-dead-retire', details)
             daemon?.recordOrderlyExit()
-            daemonLog.close()
             // Skip PTY teardown so replacement daemons cold-restore scrollback from unclean session metadata.
-            process.exit(1)
+            void processExit.exit(1)
           }
         })
       : null
@@ -291,13 +292,11 @@ async function main(): Promise<void> {
       deathWatch?.stop()
       shuttingDown = true
       daemonLog.log('shutdown', { reason: 'idle' })
-      daemonLog.close()
-      process.exit(0)
+      void processExit.exit(0)
     },
     onRpcShutdown: () => {
       shutdownDeadline.cancel()
-      daemonLog.close()
-      process.exit(0)
+      void processExit.exit(0)
     },
     onShutdownRequested: beginShutdown
   })
