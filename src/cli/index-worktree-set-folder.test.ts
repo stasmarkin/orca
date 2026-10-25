@@ -306,6 +306,19 @@ describe('orca worktree set for folder workspaces', () => {
       expect(calledMethods()).not.toContain('folderWorkspace.update')
     })
 
+    it('treats a trailing slash as the same path, not a deeper folder', async () => {
+      queueFixtures(
+        callMock,
+        worktreeListFixture([]),
+        ...folderCatalog([folder('f1'), { ...folder('f2'), folderPath: '/tmp/folder/' }])
+      )
+
+      const output = await runSet(['--worktree', 'active', '--read'], NOTES)
+
+      expect(output.error.code).toBe('selector_ambiguous')
+      expect(calledMethods()).not.toContain('folderWorkspace.update')
+    })
+
     it('ignores folders that live on an SSH host', async () => {
       queueFixtures(callMock, worktreeListFixture([]), ...folderCatalog([folder('remote', 'ssh')]))
 

@@ -1,7 +1,10 @@
 import type { FolderWorkspace } from '../../shared/folder-workspace-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { resolve as resolvePath } from 'node:path'
-import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
+import {
+  isPathInsideOrEqual,
+  normalizeRuntimePathForComparison
+} from '../../shared/cross-platform-path'
 import { resolveFolderWorkspaceHost } from '../../shared/folder-workspace-execution-host'
 import type { ProjectGroup } from '../../shared/project-group-types'
 import type { Repo } from '../../shared/repo-types'
@@ -194,8 +197,11 @@ async function selectEnclosingLocalFolderWorkspace(
   const native = enclosing.filter(
     (folder) => resolveFolderWorkspaceHost(state, folder.id).kind === 'local'
   )
-  const longest = Math.max(...native.map((folder) => folder.folderPath.length))
-  const innermost = native.filter((folder) => folder.folderPath.length === longest)
+  // Depth by comparison key, so `/a/b/` and `/a/b` count as the same folder (a tie), not nested.
+  const depth = (folder: FolderWorkspace) =>
+    normalizeRuntimePathForComparison(folder.folderPath).length
+  const longest = Math.max(...native.map(depth))
+  const innermost = native.filter((folder) => depth(folder) === longest)
   if (innermost.length <= 1) {
     return innermost[0]?.id ?? null
   }
