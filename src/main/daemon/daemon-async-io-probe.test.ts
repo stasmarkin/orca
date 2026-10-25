@@ -57,6 +57,16 @@ describe('daemon asynchronous I/O progress', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it('re-probes on a fresh check even inside the healthy cache window', async () => {
+    let now = 1
+    const start = vi.fn((done: () => void) => done())
+    const probe = new DaemonAsyncIoProbe(start, () => now)
+    await probe.check()
+    now = 2
+    await probe.check({ fresh: true })
+    expect(start).toHaveBeenCalledTimes(2)
+  })
+
   it('does not flag normal delayed completion as a stall', async () => {
     vi.useFakeTimers()
     const probe = new DaemonAsyncIoProbe((done) => {
