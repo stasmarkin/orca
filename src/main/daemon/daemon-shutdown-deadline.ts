@@ -4,7 +4,7 @@ export const DAEMON_SHUTDOWN_TIMEOUT_MS = 5_000
 
 /** Force exit if shutdown stalls, including RPC teardown. */
 export function createDaemonShutdownDeadline(
-  log: DaemonFileLog,
+  log: Pick<DaemonFileLog, 'log'>,
   exit: () => void
 ): { start: () => void; cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -15,7 +15,6 @@ export function createDaemonShutdownDeadline(
       }
       timer = setTimeout(() => {
         log.log('shutdown-error', { message: 'shutdown timeout' })
-        log.close()
         exit()
       }, DAEMON_SHUTDOWN_TIMEOUT_MS)
       timer.unref()
