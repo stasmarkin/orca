@@ -81,7 +81,7 @@ export async function normalizeWorktreeSelectorForCaller(
   )
 }
 
-function assertLocalCwdWorktreeSelector(selector: string, client: RuntimeClient): void {
+export function assertLocalCwdWorktreeSelector(selector: string, client: RuntimeClient): void {
   if (!client.isRemote) {
     return
   }

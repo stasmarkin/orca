@@ -110,6 +110,8 @@ When `worktree create` runs from inside an Orca-managed worktree, Orca records t
 
 `worktree set --pin` moves the workspace into the sidebar's Pinned section; `--unpin` takes it out again. `worktree ps` and `worktree list` report the current value as `pinned` (`isPinned` in `--json`).
 
+`worktree set` also updates folder workspaces. Pass `--worktree folder:<folderId>`, or `active` from inside a folder that no worktree encloses (local CLI only; from an SSH terminal pass the folder id). Folders accept `--display-name`, `--comment`, `--workspace-status`, `--unread`/`--read`, and `--pin`/`--unpin`; link issues and reviews with `orca reference add`, and lineage flags do not apply.
+
 Agent startup flags:
 
 ```bash
