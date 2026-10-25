@@ -1,0 +1,215 @@
+# Local install of Orca from these sources, for this fork only.
+#
+# `just install` builds the current working tree and replaces /Applications/Orca.app with it.
+# The replacement runs detached on purpose: it quits Orca, and this command is usually typed into
+# a terminal that Orca itself owns, so an attached script would be killed halfway through.
+#
+# The installed app keeps bundle id com.stablyai.orca, so it shares the official app's profile
+# (~/Library/Application Support/orca) — same workspaces, settings and accounts.
+#
+# NOTE: this file lives on the fork-only/tooling branch and reaches `local` only through a merge.
+# Branch pull requests from `main` (the upstream mirror), never from `local`, or it rides along in
+# the diff. Fork layout, feature table and sync recipe: FORK-STATUS.md (-> .git/fork-status.md).
+
+install_dir := env_var('HOME') / '.orca-local-install'
+backup_app := install_dir / 'Orca-previous.app'
+# The signed release, kept from the first install only: after that every backup is a local build,
+# and without this copy there is no way back to a notarized app except a fresh download.
+original_app := install_dir / 'Orca-original.app'
+install_log := install_dir / 'install.log'
+# Why a fixed self-signed identity, not ad-hoc: TCC pins a grant to the signature's designated
+# requirement, and ad-hoc pins it to a cdhash that changes with every build.
+sign_identity := 'Orca Local Dev'
+
+[private]
+default:
+    @just --list
+
+# Build a .app from the current working tree (no install).
+build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+      echo "just build targets macOS; use pnpm build:linux elsewhere." >&2
+      exit 1
+    fi
+    # Exact quoted match: find-identity prints `<sha1> "<name>"`, and a prefix match would accept
+    # "Orca Local Dev 2" — a different certificate, so a different requirement.
+    sign_hashes="$(security find-identity -v -p codesigning | grep -F '"{{ sign_identity }}"' | awk '{print $2}' | sort -u || true)"
+    if [[ "$(printf '%s' "$sign_hashes" | grep -c . || true)" -gt 1 ]]; then
+      echo "Several valid identities are named \"{{ sign_identity }}\": $(echo $sign_hashes)." >&2
+      echo "Keep one in Keychain Access, or every build may pick a different one and break TCC grants." >&2
+      exit 1
+    fi
+    if [[ -z "$sign_hashes" ]]; then
+      echo "No valid code-signing identity \"{{ sign_identity }}\" in the keychain." >&2
+      echo "Without it the build would be ad-hoc, and macOS would ask for every permission again after install." >&2
+      echo "Create it once (login keychain, self-signed, 10 years):" >&2
+      echo "  d=\$(mktemp -d) && /usr/bin/openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj '/CN={{ sign_identity }}' \\" >&2
+      echo "    -addext 'extendedKeyUsage=critical,codeSigning' -addext 'keyUsage=critical,digitalSignature' \\" >&2
+      echo "    -keyout \$d/key.pem -out \$d/cert.pem \\" >&2
+      echo "  && /usr/bin/openssl pkcs12 -export -inkey \$d/key.pem -in \$d/cert.pem -name '{{ sign_identity }}' -out \$d/id.p12 -passout pass:tmp \\" >&2
+      echo "  && security import \$d/id.p12 -k ~/Library/Keychains/login.keychain-db -P tmp -T /usr/bin/codesign \\" >&2
+      echo "  && security add-trusted-cert -r trustRoot -p codeSign -k ~/Library/Keychains/login.keychain-db \$d/cert.pem \\" >&2
+      echo "  ; rm -rf \$d" >&2
+      exit 1
+    fi
+    # electron-builder and the nested-helper signers in config/electron-builder.config.cjs all read
+    # CSC_NAME, so the app, its Helper apps and the terminal daemon host share one identity. The
+    # hash, not the name: electron-builder matches CSC_NAME as a substring of find-identity lines.
+    export CSC_NAME="$sign_hashes"
+    # It would otherwise take precedence over CSC_NAME for the Computer Use helper.
+    unset ORCA_COMPUTER_MACOS_SIGN_IDENTITY
+    # Why not plain `pnpm install`: build:mac packages x64 and arm64, and a host-only install
+    # makes electron-builder's beforePack guard fail on the slice whose natives are missing.
+    pnpm install:release
+    # mobile/ is its own pnpm workspace; build:mac bundles the mobile web app from mobile/node_modules.
+    pnpm --dir mobile install --frozen-lockfile
+    pnpm build:mac
+    # Why: a local build does not force signing, so electron-builder falls back to ad-hoc silently.
+    requirement="certificate leaf = H\"$sign_hashes\""
+    for app in dist/mac/Orca.app dist/mac-arm64/Orca.app; do
+      [[ -d "$app" ]] || continue
+      for code in "$app" "$app"/Contents/Frameworks/*.app "$app"/Contents/Helpers/*.app \
+        "$app"/Contents/Resources/*.app "$app"/Contents/MacOS/*; do
+        [[ -e "$code" ]] || continue
+        if ! codesign --verify --strict -R="$requirement" "$code" 2>/dev/null; then
+          echo "$code is not signed by \"{{ sign_identity }}\" ($sign_hashes)." >&2
+          exit 1
+        fi
+      done
+      codesign --verify --deep --strict "$app"
+    done
+    echo "Built: $(just _built-app)"
+
+# Build the current working tree and install it over /Applications/Orca.app.
+# `just install any-tree` installs a tree that is not on the `local` branch.
+install force="": (_assert-local force) build swap
+
+# `local` is the only branch that carries every feature; a checkout sitting on one feature branch
+# builds an app missing the rest, and nothing about the result says so.
+[private]
+_assert-local force:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Positional and spelled exactly, not `force=yes`: just reads that form as the argument's value,
+    # so the override silently did nothing — and a typo must not be what disables the check.
+    if [[ -n "{{ force }}" ]]; then
+      if [[ "{{ force }}" != "any-tree" ]]; then
+        echo "Unknown argument \"{{ force }}\". To install this tree anyway: just install any-tree" >&2
+        exit 1
+      fi
+      echo "any-tree: installing this tree, whatever it holds."
+      exit 0
+    fi
+    branch="$(git rev-parse --abbrev-ref HEAD)"
+    if [[ "$branch" != "local" ]]; then
+      echo "This tree is on $branch, not local, so the build would carry only what this branch holds." >&2
+      echo "Switch to local (see FORK-STATUS.md) or override: just install any-tree" >&2
+      exit 1
+    fi
+
+# Install the most recent build without rebuilding.
+swap:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    src="$(just _built-app)"
+    mkdir -p "{{ install_dir }}"
+    installer="{{ install_dir }}/swap.sh"
+    cat > "$installer" <<'INSTALLER'
+    #!/usr/bin/env bash
+    set -euo pipefail
+    src="$1"; dest="/Applications/Orca.app"; backup="$2"; original="$3"
+    staged="/Applications/.Orca.app.incoming"
+    # Gatekeeper, because only a notarized app passes it: "not ad-hoc" would also accept an unsigned
+    # slice or one signed with a Developer ID found in the keychain, and either would spend the only
+    # slot for the release on a copy of what we are replacing. Version cannot tell them apart —
+    # this justfile does not stamp one.
+    if [ ! -d "$original" ] && [ -d "$dest" ] && spctl -a -t exec "$dest" >/dev/null 2>&1; then
+      echo "[$(date '+%H:%M:%S')] keeping the signed release at $original"
+      ditto "$dest" "$original"
+    fi
+    # Why stage first: the two moves below are the only window where /Applications has no Orca.app.
+    # Copying straight over the destination would leave it half-written if this process is killed.
+    echo "[$(date '+%H:%M:%S')] staging $src"
+    rm -rf "$staged"
+    ditto "$src" "$staged"
+    # Why: a locally built app is not notarized, and a stale quarantine flag would make Gatekeeper
+    # refuse it without the right-click dance on every install.
+    xattr -dr com.apple.quarantine "$staged" 2>/dev/null || true
+    echo "[$(date '+%H:%M:%S')] quitting Orca"
+    osascript -e 'tell application "Orca" to quit' >/dev/null 2>&1 || true
+    for _ in $(seq 1 60); do pgrep -x Orca >/dev/null || break; sleep 0.5; done
+    if pgrep -x Orca >/dev/null; then
+      echo "[$(date '+%H:%M:%S')] Orca ignored the quit request; terminating"
+      pkill -x Orca || true
+      sleep 2
+    fi
+    rm -rf "$backup"
+    [ -d "$dest" ] && mv "$dest" "$backup"
+    mv "$staged" "$dest"
+    echo "[$(date '+%H:%M:%S')] launching"
+    open -a "$dest"
+    echo "[$(date '+%H:%M:%S')] done"
+    INSTALLER
+    chmod +x "$installer"
+    echo "Installing $src over /Applications/Orca.app."
+    echo "Orca will quit and reopen; this terminal goes with it."
+    echo "Progress: tail -f {{ install_log }}"
+    echo "Undo:     just revert"
+    nohup bash "$installer" "$src" "{{ backup_app }}" "{{ original_app }}" >"{{ install_log }}" 2>&1 &
+    sleep 1
+
+# Restore the app this install replaced.
+revert:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -d "{{ backup_app }}" ]]; then
+      echo "No backup at {{ backup_app }}." >&2
+      exit 1
+    fi
+    just _swap-back
+
+[private]
+_swap-back:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "{{ install_dir }}"
+    installer="{{ install_dir }}/revert.sh"
+    cat > "$installer" <<'INSTALLER'
+    #!/usr/bin/env bash
+    set -euo pipefail
+    backup="$1"; dest="/Applications/Orca.app"
+    osascript -e 'tell application "Orca" to quit' >/dev/null 2>&1 || true
+    for _ in $(seq 1 60); do pgrep -x Orca >/dev/null || break; sleep 0.5; done
+    pgrep -x Orca >/dev/null && { pkill -x Orca || true; sleep 2; }
+    rm -rf "$dest"
+    mv "$backup" "$dest"
+    open -a "$dest"
+    INSTALLER
+    chmod +x "$installer"
+    echo "Restoring {{ backup_app }}; Orca will quit and reopen."
+    nohup bash "$installer" "{{ backup_app }}" >"{{ install_log }}" 2>&1 &
+    sleep 1
+
+# Tail the detached installer's log.
+logs:
+    @tail -n 40 "{{ install_log }}" 2>/dev/null || echo "No install log yet."
+
+[private]
+_built-app:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Why not `ls -dt dist/mac*`: build:mac packages x64 and arm64, so the newest directory is
+    # whichever electron-builder finished last — on an Intel host that installs an arm64 bundle
+    # that will not launch, after the working app has already been moved to the backup.
+    case "$(uname -m)" in
+      arm64) app="dist/mac-arm64/Orca.app" ;;
+      x86_64) app="dist/mac/Orca.app" ;;
+      *) echo "Unsupported architecture $(uname -m)." >&2; exit 1 ;;
+    esac
+    if [[ ! -x "$app/Contents/MacOS/Orca" ]]; then
+      echo "No $(uname -m) build at $app. Run: just build" >&2
+      exit 1
+    fi
+    printf '%s\n' "$(cd "$(dirname "$app")" && pwd)/$(basename "$app")"
