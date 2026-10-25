@@ -86,6 +86,7 @@ function countWorkspaceRows(rows: readonly Row[]): number {
   // Collapsed groups have no item rows; count headers so populated projects do not show a zero host badge.
   let count = 0
   const seenWorktreeIds = new Set<string>()
+  const seenFolderWorkspaceIds = new Set<string>()
   let pendingHeader: Extract<Row, { type: 'header' }> | null = null
   let pendingHeaderHadWorkspaces = false
   const flushHeader = (): void => {
@@ -122,7 +123,11 @@ function countWorkspaceRows(rows: readonly Row[]): number {
       continue
     }
     if (row.type === 'folder-workspace') {
-      count += 1
+      // duplicate-in-groups renders a pinned folder twice; it is still one workspace.
+      if (!seenFolderWorkspaceIds.has(row.folderWorkspace.id)) {
+        count += 1
+        seenFolderWorkspaceIds.add(row.folderWorkspace.id)
+      }
       pendingHeaderHadWorkspaces = pendingHeader !== null
     }
   }

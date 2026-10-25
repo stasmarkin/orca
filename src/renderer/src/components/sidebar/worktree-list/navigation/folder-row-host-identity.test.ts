@@ -3,6 +3,8 @@ import { makeFolderWorkspace } from '@/store/slices/worktrees-slice-test-fixture
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import { folderWorkspaceToWorktree } from '../../../../../../shared/folder-workspace-worktree'
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
+import { getProjectGroupHeaderKey } from '../../../../../../shared/sidebar-list/group-keys'
+import { buildFolderWorkspaceRow } from '../../../../../../shared/sidebar-list/row-builders'
 import { getRenderRowKey, type RenderRow } from '../listing/render-row'
 import { getWorktreeOptionId } from '../rows/option-dom'
 import { getActiveDescendantOptionId, getRenderRowOptionId } from './active-descendant-option'
@@ -27,14 +29,13 @@ const group: ProjectGroup = {
 }
 const rows: Extract<RenderRow, { type: 'folder-workspace' }>[] = (
   ['local', 'runtime:host'] as const
-).map((executionHostId) => ({
-  type: 'folder-workspace',
-  key: executionHostId,
-  folderWorkspace: makeFolderWorkspace({ id: 'same', executionHostId }),
-  projectGroup: group,
-  depth: 0,
-  groupDepth: 0
-}))
+).map((executionHostId) =>
+  buildFolderWorkspaceRow(
+    { folderWorkspace: makeFolderWorkspace({ id: 'same', executionHostId }), projectGroup: group },
+    getProjectGroupHeaderKey(group.id),
+    0
+  )
+)
 const workspaceId = 'folder:same'
 
 it.each(['local', 'runtime:host'] as const)(
@@ -56,7 +57,7 @@ it('gives same-ID folders distinct DOM, virtual and sidebar row identities', () 
   expect(new Set(rows.map((row) => getRenderRowOptionId(row))).size).toBe(2)
   for (const row of rows) {
     const key = getWorktreeHostIdentity(folderWorkspaceToWorktree(row.folderWorkspace))
-    expect(getRenderRowSidebarKey(row)).toBe(key)
+    expect(getRenderRowSidebarKey(row)).toBe(row.key)
     expect(rowKeyMatchesRenderRow(row, key)).toBe(true)
     expect(
       rowKeyMatchesRenderRow(
@@ -71,7 +72,6 @@ it.each(['local', 'runtime:host'] as const)(
   'announces the selected folder on %s instead of the first same-ID row',
   (host) => {
     const selected = rows.find((row) => row.folderWorkspace.executionHostId === host)!
-    const key = getWorktreeHostIdentity(folderWorkspaceToWorktree(selected.folderWorkspace))
     expect(
       getActiveDescendantOptionId({
         activeWorktreeId: workspaceId,
@@ -80,7 +80,7 @@ it.each(['local', 'runtime:host'] as const)(
         renderRows: rows,
         virtualItems: [{ index: 0 }, { index: 1 }]
       })
-    ).toBe(getWorktreeOptionId(key))
+    ).toBe(getWorktreeOptionId(selected.key))
     for (const row of rows) {
       expect(renderRowContainsWorktree(row, workspaceId, host)).toBe(row === selected)
       expect(renderRowContainsWorktree(row, workspaceId)).toBe(true)

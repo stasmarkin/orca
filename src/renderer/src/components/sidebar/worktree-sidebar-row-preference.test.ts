@@ -4,6 +4,11 @@ import type { ProjectGroup } from '../../../../shared/project-group-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { HostSectionRow } from '../../../../shared/sidebar-list/host-section-rows'
+import {
+  PINNED_GROUP_KEY,
+  getProjectGroupHeaderKey
+} from '../../../../shared/sidebar-list/group-keys'
+import { buildFolderWorkspaceRow } from '../../../../shared/sidebar-list/row-builders'
 import { getRenderedWorktreesInSidebarOrder } from './worktree-sidebar-row-preference'
 
 const repo: Repo = {
@@ -79,20 +84,17 @@ const folderWorkspace: FolderWorkspace = {
   updatedAt: 1
 }
 
+function folderRow(sectionKey: string, workspace = folderWorkspace): HostSectionRow {
+  return buildFolderWorkspaceRow({ folderWorkspace: workspace, projectGroup }, sectionKey, 0)
+}
+
 describe('getRenderedWorktreesInSidebarOrder', () => {
   it('keeps folder workspaces in visual order while preferring natural pinned rows', () => {
     const pinned = worktree('pinned', true)
     const afterFolder = worktree('after-folder')
     const rows: HostSectionRow[] = [
       item(pinned, 'pinned'),
-      {
-        type: 'folder-workspace',
-        key: 'folder-workspace:folder-1',
-        folderWorkspace,
-        projectGroup,
-        depth: 0,
-        groupDepth: 0
-      },
+      folderRow(getProjectGroupHeaderKey(projectGroup.id)),
       item(pinned, 'repo:repo-1'),
       item(afterFolder, 'repo:repo-1')
     ]
@@ -100,5 +102,30 @@ describe('getRenderedWorktreesInSidebarOrder', () => {
     expect(
       getRenderedWorktreesInSidebarOrder(rows, 'duplicate-in-groups').map(({ id }) => id)
     ).toEqual(['folder:folder-1', 'pinned', 'after-folder'])
+  })
+
+  it('counts a duplicated pinned folder workspace once, at its natural position', () => {
+    // Why: the Pinned copy and the group copy are one workspace to selection and
+    // Cmd+Shift+Arrow. Counting both would put the same card in the order twice.
+    const pinnedFolder = { ...folderWorkspace, isPinned: true }
+    const rows: HostSectionRow[] = [
+      folderRow(PINNED_GROUP_KEY, pinnedFolder),
+      item(worktree('after-pinned'), 'repo:repo-1'),
+      folderRow(getProjectGroupHeaderKey(projectGroup.id), pinnedFolder)
+    ]
+
+    expect(
+      getRenderedWorktreesInSidebarOrder(rows, 'duplicate-in-groups').map(({ id }) => id)
+    ).toEqual(['after-pinned', 'folder:folder-1'])
+  })
+
+  it('keeps the pinned folder workspace when it is its only rendered copy', () => {
+    const rows: HostSectionRow[] = [
+      folderRow(PINNED_GROUP_KEY, { ...folderWorkspace, isPinned: true })
+    ]
+
+    expect(getRenderedWorktreesInSidebarOrder(rows, 'single-location').map(({ id }) => id)).toEqual(
+      ['folder:folder-1']
+    )
   })
 })

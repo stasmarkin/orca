@@ -108,14 +108,16 @@ export function appendWorktreeRows(
   }
 }
 
-/** One host-keyed folder row constructor for all emitters; IDs can collide across hosts. */
+/** One host-keyed, section-qualified folder row constructor for all emitters. */
 export function buildFolderWorkspaceRow(
   pair: RenderableFolderWorkspace,
+  sectionKey: string,
   groupDepth: number
 ): FolderWorkspaceRow {
   return {
     type: 'folder-workspace',
-    key: `folder-workspace:${getFolderWorkspaceHostIdentity(pair.folderWorkspace)}`,
+    key: `${sectionKey}:folder-workspace:${getFolderWorkspaceHostIdentity(pair.folderWorkspace)}`,
+    sectionKey,
     folderWorkspace: pair.folderWorkspace,
     projectGroup: pair.projectGroup,
     depth: 0,

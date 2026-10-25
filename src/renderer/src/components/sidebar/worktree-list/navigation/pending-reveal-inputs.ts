@@ -68,7 +68,8 @@ export function expandGroupsForWorktreeReveal(
       workspaceStatuses: args.workspaceStatuses,
       defaultHostId: args.defaultHostId,
       hostScopedGroups,
-      executionHostId
+      executionHostId,
+      pinnedDisplayPolicy: args.pinnedDisplayPolicy
     }
   )
   if (folderGroupKeys.length > 0) {

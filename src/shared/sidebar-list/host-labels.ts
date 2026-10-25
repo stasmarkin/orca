@@ -254,3 +254,32 @@ export function getLaneHostCountedWorkspaceIds(
   }
   return idsByHost
 }
+
+/** Host bookkeeping and badge keys shared by lane headers that mix worktrees and folder workspaces. */
+export function getLaneHeaderHostFields(
+  worktrees: readonly Worktree[],
+  folderWorkspaces: readonly RenderableFolderWorkspace[],
+  repoOf: RepoOfWorktree,
+  defaultHostId: ExecutionHostId
+) {
+  return {
+    hostWorktreeCounts: getLaneHostWorktreeCounts(
+      worktrees,
+      folderWorkspaces,
+      repoOf,
+      defaultHostId
+    ),
+    hostWorktreeIds: getLaneHostWorktreeIds(worktrees, folderWorkspaces, repoOf, defaultHostId),
+    worktreeIds: worktrees.map((worktree) => worktree.id),
+    countedWorkspaceIds: [
+      ...worktrees.map(getWorktreeHostIdentity),
+      ...folderWorkspaces.map((pair) => getFolderWorkspaceHostIdentity(pair.folderWorkspace))
+    ],
+    hostCountedWorkspaceIds: getLaneHostCountedWorkspaceIds(
+      worktrees,
+      folderWorkspaces,
+      repoOf,
+      defaultHostId
+    )
+  }
+}
