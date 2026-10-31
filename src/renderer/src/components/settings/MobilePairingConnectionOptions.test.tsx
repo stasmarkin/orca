@@ -199,24 +199,6 @@ describe('MobilePairingConnectionOptions', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('selects a path from the compact list', async () => {
-    const user = userEvent.setup()
-    const onChange = vi.fn()
-    render(<MobilePairingConnectionOptions value="local-only" onChange={onChange} />)
-
-    expect(
-      screen.getByText('Phone can be on cellular or any Wi‑Fi. Sign-in required for Relay only.')
-    ).toBeVisible()
-    expect(
-      screen.getByText(
-        'Phone must be on this Wi‑Fi or connected through Tailscale. No account needed.'
-      )
-    ).toBeVisible()
-
-    await user.click(screen.getByRole('radio', { name: /Orca Relay/i }))
-    expect(onChange).toHaveBeenCalledWith('automatic')
-  })
-
   it('refreshes auth status when it is missing on mount', () => {
     mocks.state = {
       ...mocks.state,
@@ -225,29 +207,6 @@ describe('MobilePairingConnectionOptions', () => {
     render(<MobilePairingConnectionOptions value="automatic" onChange={vi.fn()} />)
     expect(fetchAuthStatus).toHaveBeenCalledOnce()
     expect(screen.getByTestId('anywhere-sign-in-panel')).toBeVisible()
-  })
-
-  it('shows relay status when signed in on Orca Relay', async () => {
-    mocks.state = {
-      orcaProfileAuthStatus: {
-        activeProfileId: 'profile-1',
-        configured: true,
-        state: 'connected',
-        persistence: 'encrypted'
-      },
-      connectCurrentOrcaProfile: connect,
-      fetchOrcaProfileAuthStatus: fetchAuthStatus
-    }
-    const onChange = vi.fn()
-    const user = userEvent.setup()
-    render(<MobilePairingConnectionOptions value="automatic" onChange={onChange} />)
-
-    await waitFor(() => expect(screen.getByText('Ready')).toBeVisible())
-    expect(screen.queryByTestId('anywhere-sign-in-panel')).toBeNull()
-
-    await user.click(screen.getByRole('radio', { name: /^LAN\b/i }))
-    expect(onChange).toHaveBeenCalledWith('local-only')
-    statusListener?.({ status: 'standby' })
   })
 
   it('names the assigned relay cell by host once the status carries one', async () => {
@@ -276,58 +235,6 @@ describe('MobilePairingConnectionOptions', () => {
 
     statusListener?.({ status: 'offline' })
     await waitFor(() => expect(screen.queryByTestId('relay-cell-line')).toBeNull())
-  })
-
-  it('shows clock guidance from status and clears it when Relay recovers', async () => {
-    mocks.state = {
-      ...mocks.state,
-      orcaProfileAuthStatus: {
-        activeProfileId: 'profile-1',
-        configured: true,
-        state: 'connected',
-        persistence: 'encrypted'
-      }
-    }
-    render(<MobilePairingConnectionOptions value="automatic" onChange={vi.fn()} />)
-    await waitFor(() => expect(screen.getByText('Ready')).toBeVisible())
-
-    statusListener?.({ status: 'offline', clockOffsetMs: -38_000 })
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "Your computer's clock is off by about 38 seconds. Turn on automatic time, then retry."
-    )
-
-    statusListener?.({ status: 'registered' })
-    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
-  })
-
-  it('keeps LAN available while Relay is retrying', async () => {
-    mocks.state = {
-      ...mocks.state,
-      orcaProfileAuthStatus: {
-        activeProfileId: 'profile-1',
-        configured: true,
-        state: 'connected',
-        persistence: 'encrypted'
-      }
-    }
-    const onChange = vi.fn()
-    const user = userEvent.setup()
-    render(
-      <MobilePairingConnectionOptions
-        value="automatic"
-        onChange={onChange}
-        relayMintFailed
-        relayMintRetrying
-      />
-    )
-
-    expect(screen.getByText('Retrying')).toBeVisible()
-    const relay = screen.getByRole('radio', { name: /Orca Relay/i })
-    const lan = screen.getByRole('radio', { name: /^LAN\b/i })
-    expect(relay).toHaveAttribute('aria-disabled', 'true')
-    expect(lan).toHaveAttribute('aria-disabled', 'false')
-    await user.click(lan)
-    expect(onChange).toHaveBeenCalledWith('local-only')
   })
 
   it('re-reads a session revoked since startup and offers Sign in again', async () => {

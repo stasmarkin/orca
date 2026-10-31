@@ -172,23 +172,6 @@ describe('HeroFlow height', () => {
     expect(onOpenAndroidInstallGuide).toHaveBeenCalledOnce()
   })
 
-  it('shows Relay mint failure with no QR and the beta note', () => {
-    renderFlow(1, {
-      pairQrDataUrl: null,
-      relayMintFailure: {
-        code: 'relay offline',
-        stage: 'create_pairing_relay',
-        message: 'relay offline'
-      }
-    })
-    const notice = screen.getByTestId('relay-mint-failure-notice')
-    expect(notice).toHaveTextContent('Couldn’t create a Relay pairing code')
-    expect(notice).toHaveTextContent('Use LAN')
-    expect(screen.getByText('No pairing code available')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Generate code' })).not.toBeInTheDocument()
-    expect(screen.getByText('Orca Relay is in beta.')).toBeInTheDocument()
-  })
-
   it('explains an empty QR frame when no code has been generated yet', () => {
     renderFlow(1, { pairQrDataUrl: null, canGeneratePairing: true })
     expect(screen.getByText('Generate a pairing code to continue')).toBeInTheDocument()

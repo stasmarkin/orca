@@ -19,12 +19,14 @@ import {
 const RELAY_PROVIDER_INSTALL_WAIT_MS = 15_000
 
 export class RuntimeRpcMobilePairing extends RuntimeRpcPairing {
-  async createMobilePairingOffer(args: {
+  async createMobilePairingOffer(requested: {
     address?: string | null
     connectionMode?: MobilePairingConnectionMode
     name?: string
     rotate?: boolean
   }): Promise<MobilePairingOffer> {
+    // fork:local-only — every offer is LAN-only, whatever the caller asks; Relay is never minted.
+    const args = { ...requested, connectionMode: 'local-only' as const }
     // Network pairing opts into LAN exposure: widen before advertising QR endpoints; failed widening stays unavailable on loopback (STA-2370).
     try {
       await this.ensureNetworkExposure()

@@ -10,7 +10,7 @@ import type { DeviceRegistry } from '../device-registry'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import type { OrcaRuntimeRpcServer } from '../runtime-rpc'
 import { PushDispatcher } from './push-dispatcher'
-import { PushGatewayClient } from './push-gateway-client'
+import type { PushGatewayClient } from './push-gateway-client'
 import { PushRegisterThrottle } from './push-register-throttle'
 import type { PushUnregisterOutbox } from './push-unregister-outbox'
 
@@ -69,15 +69,9 @@ export class DesktopPushService {
   }
 
   /** Returns null when the mobile runtime never came up, so there is nothing to push for. */
-  static create(options: DesktopPushServiceOptions): DesktopPushService | null {
-    const keypair = options.runtimeRpc.getE2EEKeypair()
-    const registry = options.runtimeRpc.getDeviceRegistry()
-    if (!keypair || !registry) {
-      return null
-    }
-    const client =
-      options.client ?? new PushGatewayClient({ gatewayUrl: options.gatewayUrl, keypair })
-    return new DesktopPushService(options, registry, client)
+  static create(_options: DesktopPushServiceOptions): DesktopPushService | null {
+    // fork:local-only — the vendor push gateway is never used; phones get notifications only while connected over LAN.
+    return null
   }
 
   start(): void {
