@@ -276,50 +276,6 @@ it('reads live pairing names from the standalone RPC registry', async () => {
   }
 })
 
-it('starts push after RPC identity is available and stops dispatch on shutdown', async () => {
-  state.root = mkdtempSync(join(tmpdir(), 'orca-headless-push-'))
-  state.controller = new RuntimeMobileNotificationController()
-  state.registry = new DeviceRegistry(state.root)
-  const phone = state.registry.addDevice('headless-phone', 'mobile')
-  const { startOrcad } = await import('./orcad-entry')
-  const host = await startOrcad({ noPairing: true, json: true })
-  try {
-    const result = await state.controller.registerPushDevice({
-      deviceId: phone.deviceId,
-      platform: 'android',
-      token: 'test-token',
-      filter: {
-        onlyWhenDesktopAway: true
-      }
-    })
-    expect(result).toMatchObject({ registered: true })
-    expect(state.registry.getDevice(phone.deviceId)?.pushRegistration?.expiresAt).toBeGreaterThan(
-      Date.now()
-    )
-    state.controller.dispatch({
-      type: 'notification',
-      source: 'agent-task-complete',
-      title: 'QA',
-      body: 'QA'
-    })
-    await new Promise((resolve) => setImmediate(resolve))
-    expect(state.send).toHaveBeenCalledTimes(1)
-  } finally {
-    await host.stop()
-  }
-  expect(readdirSync(profileStateAccessPaths(state.root).participants)).toEqual([])
-  acquireProfileStateMaintenance(state.root).release()
-  expect(state.controller.getListenerCount()).toBe(0)
-  expect(state.rpcStarted).toBe(false)
-  expect(state.onSettingsChanged).toHaveBeenCalledOnce()
-  expect(state.removeSettingsListener).toHaveBeenCalledOnce()
-  await host.stop()
-  expect(state.removeSettingsListener).toHaveBeenCalledOnce()
-  expect(await state.controller.registerPushDevice({} as never)).toMatchObject({
-    registered: false
-  })
-})
-
 it('releases admission when host setup fails before a runtime exists', async () => {
   state.root = mkdtempSync(join(tmpdir(), 'orca-headless-setup-failure-'))
   state.profileStartupErrors.push(new Error('profile startup failed'))

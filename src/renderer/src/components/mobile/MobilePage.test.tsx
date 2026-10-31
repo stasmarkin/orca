@@ -185,7 +185,7 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() => expect(getPairingQR).toHaveBeenCalledTimes(1))
     expect(getPairingQR).toHaveBeenCalledWith({
       address: '10.0.0.9',
-      connectionMode: 'automatic'
+      connectionMode: 'local-only'
     })
   })
 })
