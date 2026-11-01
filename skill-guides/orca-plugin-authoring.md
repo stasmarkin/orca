@@ -65,14 +65,16 @@ with `terminal:send` can.
 
 1. `ORCA plugin create ./my-plugin --template components --json`. Leave out `--publisher`.
 2. In a background terminal, run `ORCA plugin dev watch ./my-plugin --check --shot
-   ./my-plugin/.orca/shots --json` and keep reading it (events in `references/workflow.md`).
+   ./my-plugin/.orca/shots --json` and keep reading it (events:
+   `ORCA skills get orca-plugin-authoring --reference workflow`).
    Consent exits `3`: see [Approval](#approval).
 3. Edit and save. Each save prints `reloaded`, a `check` of what each panel drew or threw, and a
    `shot` whose `path` is a PNG of the panel exactly as Orca draws it: read the image and fix
    what looks wrong. Fix every `log` error (`[frame] <file>:<line>`) and `check` issue. To see a
    state behind input, `ORCA plugin shot <plugin-key> --act '<json>'` types and presses first.
 4. `ORCA plugin test <dir> --json` after changes, and `ORCA plugin check <dir> --json` before you
-   finish (it runs the worker; add states in `src/panel.check.ts`, see `references/workflow.md`).
+   finish (it runs the worker; add states in `src/panel.check.ts`, see
+   `ORCA skills get orca-plugin-authoring --reference workflow`).
    For a worker, `ORCA plugin dev emit . <event> --data '{...}'` fires a test event and
    `ORCA plugin dev request . <name> --data '{...}'` calls an `orca.panels.handle` handler.
 5. To show the user, `ORCA plugin open <plugin-key> --panel <id>`. Ctrl-C stops the watch.
@@ -98,8 +100,9 @@ fingerprint Orca did not give you. New capabilities or changed commands print a 
 
 ## Gotchas
 
-- `engines.orca` must cover the newest `Since` you use (`references/manifest.md`); components,
-  build-less entries and leaving out `publisher` need `>=1.4.246`. Ids starting `orca-` are reserved.
+- `engines.orca` must cover the newest `Since` you use; see
+  `ORCA skills get orca-plugin-authoring --reference manifest`. Components, build-less entries and
+  leaving out `publisher` need `>=1.4.246`. Ids starting `orca-` are reserved.
 - `update(atom, fn)` takes an updater only; `set(atom, value)` stores a value. Both throw while
   rendering. Components panels have no hooks and no DOM: state lives in atoms.
 - Keyed atoms (`atom('draft', '')`) survive a hot reload; unkeyed ones and module variables reset.

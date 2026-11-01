@@ -4,7 +4,7 @@ Load this when the environment is a local Docker container reached over SSH. It 
 SSH VM without cloud cost: build a base image with `sshd`, tools, repo prerequisites, and the agent
 CLI; run an interactive auth container once; then `docker commit` that container as the
 authenticated image per-workspace `create` boots from. The emitted result is the SSH shape in
-`references/ssh-host.md`.
+`ORCA skills get orca-per-workspace-env --reference ssh-host`.
 
 - Publish container SSH to a random localhost port with `-p 127.0.0.1::22`, and emit
   `connection.type:"ssh"` with `host:"127.0.0.1"`, that port, `username`, `identityFile`, and

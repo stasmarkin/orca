@@ -39,6 +39,10 @@ to another executable, which could silently target a different Orca build.
 ORCA skills get orca-cli
 ```
 
+When the guide names a reference such as `references/browser.md`, load it with
+`ORCA skills get orca-cli --reference browser`; it is not a file on disk. If that binary
+rejects `--reference`, run `ORCA skills get orca-cli --full` and read the named reference.
+
 Prefer `--json`. Use the selected executable's `--help` for commands or flags the guide does
 not cover. If a command reports that Orca is not running, start it with `ORCA open --json`
 and retry. If it fails with `runtime_access_denied`, your sandbox blocked the connection:

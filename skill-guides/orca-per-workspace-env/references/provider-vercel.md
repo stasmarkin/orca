@@ -6,7 +6,8 @@ create|exec|snapshot|remove`. Adapt the names and verify every flag against
 `vercel sandbox --help` for the user's CLI version.
 
 This is the Orca-server connection mode: the recipe emits a pairing URL. If the user chose SSH in
-the interview, use `references/ssh-host.md` instead.
+the interview, use
+`ORCA skills get orca-per-workspace-env --reference ssh-host` instead.
 
 ## Snapshot cleanup
 

@@ -134,7 +134,8 @@ Both run the plugin's code on this machine, outside Orca's sandbox: only on code
   `--json`, the whole `tree`: read them to confirm each scenario shows what it should. Exit `0`,
   `1` `plugin_check_failed`, `2` invalid.
 
-The full kit API, generated from this Orca, is in `references/testing.md`.
+The full kit API, generated from this Orca, is in
+`ORCA skills get orca-plugin-authoring --reference testing`.
 
 ### Check fixtures
 

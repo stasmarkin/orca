@@ -112,7 +112,8 @@ and resume. Orca still disconnects and reconnects its own SSH relay on sleep, wa
 is separate from these scripts.
 
 If the SSH host is instead an ephemeral, snapshot-capable VM — the user's hypervisor, or a cloud VM
-with image support — keep the base-image model from `references/provider-vercel.md` for
+with image support — keep the base-image model from
+`ORCA skills get orca-per-workspace-env --reference provider-vercel` for
 provisioning, but still emit the `connection.type:"ssh"` block above instead of starting
 `orca serve`.
 

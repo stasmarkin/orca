@@ -43,16 +43,16 @@ ORCA orchestration worker-start --spec "<task>" --worktree current --agent codex
   `ORCA worktree create --name <name> --no-parent --agent <agent> --prompt "<brief>" --json`
   and end your turn.
 - Add `--model` only if the user named one.
-- If `worker-start` fails, do not rerun it; read `failedStage` and load
-  `references/recovery-and-cleanup.md`.
+- If `worker-start` fails, do not rerun it; read `failedStage` and run
+  `ORCA skills get orchestration --reference recovery-and-cleanup`.
 - To talk to a worker, use
   `ORCA orchestration send --to dispatch:<dispatch_id> --subject "<topic>" --body "<message>"`
   in any state: a working worker gets it when its current turn ends; a finished
   or closed one gets it as a follow-up Task and reports with `worker_done`. The
   receipt says which.
   Except on a paired server: a finished worker there refuses `send`, so start
-  new work there with `worker-start --on <server>` (load
-  `references/placement-and-remote.md` first).
+  new work there with `worker-start --on <server>` (run
+  `ORCA skills get orchestration --reference placement-and-remote` first).
 
 Never:
 
@@ -98,8 +98,8 @@ gap or contradiction.
 
 Silence, a timeout, or `unverifiable` liveness alone never proves exit or authorizes
 autonomous recovery. For explicit user cancellation or assignment abandonment,
-load `references/recovery-and-cleanup.md`: requesting a guarded stop or fencing an
-assignment does not prove its agent stopped.
+run `ORCA skills get orchestration --reference recovery-and-cleanup`: requesting a
+guarded stop or fencing an assignment does not prove its agent stopped.
 
 ## References
 
