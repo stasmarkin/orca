@@ -15,11 +15,12 @@ export class DaemonAsyncIoProbe {
     private readonly now: () => number = () => performance.now()
   ) {}
 
-  check(): Promise<DaemonAsyncIoHealth> {
+  /** `fresh` skips the healthy cache: a pool can wedge right after a successful check. */
+  check(opts: { fresh?: boolean } = {}): Promise<DaemonAsyncIoHealth> {
     if (this.pending) {
       return this.pending
     }
-    if (this.now() < this.healthyUntil) {
+    if (!opts.fresh && this.now() < this.healthyUntil) {
       return Promise.resolve({ state: 'healthy', pendingMs: 0 })
     }
     const startedAt = this.now()
@@ -56,6 +57,6 @@ export class DaemonAsyncIoProbe {
 
 const daemonAsyncIoProbe = new DaemonAsyncIoProbe()
 
-export function checkDaemonAsyncIo(): Promise<DaemonAsyncIoHealth> {
-  return daemonAsyncIoProbe.check()
+export function checkDaemonAsyncIo(opts: { fresh?: boolean } = {}): Promise<DaemonAsyncIoHealth> {
+  return daemonAsyncIoProbe.check(opts)
 }
