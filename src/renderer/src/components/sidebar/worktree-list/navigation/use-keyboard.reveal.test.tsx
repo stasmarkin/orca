@@ -7,12 +7,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createSetRenamingWorktreeId } from '@/store/slices/worktrees/session/worktree-slice-lookups'
 import { createUIStore } from '@/store/slices/ui-slice-test-harness'
 import type { AppState } from '@/store/types'
-import {
-  folderWorkspaceToWorktree,
-  getFolderWorkspaceHostIdentity
-} from '../../../../../../shared/folder-workspace-worktree'
+import { folderWorkspaceToWorktree } from '../../../../../../shared/folder-workspace-worktree'
 import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-types'
 import type { HostSectionRow } from '../../../../../../shared/sidebar-list/host-section-rows'
+import { buildFolderWorkspaceRow } from '../../../../../../shared/sidebar-list/row-builders'
 import { useSidebarRevealHighlight } from './use-reveal-highlight'
 import { useSidebarRevealRequests } from './use-reveal-requests'
 import { repo, worktree } from '../../worktree-list-groups-test-fixtures'
@@ -556,18 +554,14 @@ it.each([false, true])(
       updatedAt: 0
     }
     const twins: FolderWorkspace[] = [folder, { ...folder, executionHostId: 'ssh:other' }]
-    rows = twins.map((folderWorkspace) => ({
-      type: 'folder-workspace',
-      key: 'render-model-only',
-      folderWorkspace,
-      projectGroup: group,
-      depth: 0,
-      groupDepth: 0
-    }))
-    extraOptions = twins.map((f) => ({
+    const folderRows = twins.map((folderWorkspace) =>
+      buildFolderWorkspaceRow({ folderWorkspace, projectGroup: group }, 'project-group:g', 0)
+    )
+    rows = folderRows
+    extraOptions = folderRows.map((row) => ({
       ...local,
-      worktree: folderWorkspaceToWorktree(f),
-      rowKey: getFolderWorkspaceHostIdentity(f)
+      worktree: folderWorkspaceToWorktree(row.folderWorkspace),
+      rowKey: row.key
     }))
     activeId = 'folder:f'
     renderRows = buildRenderableRows(rows)

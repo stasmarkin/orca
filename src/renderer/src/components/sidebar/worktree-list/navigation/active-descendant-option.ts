@@ -1,12 +1,10 @@
-import { getFolderWorkspaceHostIdentity } from '../../../../../../shared/folder-workspace-worktree'
 import type { RenderRow } from '../listing/render-row'
 import {
   getWorktreeExecutionHostId,
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
 import type { PinnedWorktreeDisplayPolicy } from '../../../../../../shared/sidebar-list/row-types'
-import { isPinnedWorktreeRow } from '../listing/renderable-rows'
-import { getRenderRowWorktreeItem, renderRowContainsWorktree } from './render-row-lookup'
+import { isPinnedSectionRenderRow, renderRowContainsWorktree } from './render-row-lookup'
 import { getWorktreeOptionId } from '../rows/option-dom'
 
 export function getRenderRowOptionId(
@@ -33,7 +31,7 @@ export function getRenderRowOptionId(
     return getWorktreeOptionId(row.rowKey)
   }
   if (row.type === 'folder-workspace') {
-    return getWorktreeOptionId(getFolderWorkspaceHostIdentity(row.folderWorkspace))
+    return getWorktreeOptionId(row.key)
   }
   return undefined
 }
@@ -84,15 +82,13 @@ export function getActiveDescendantOptionId(args: {
       if (!optionId) {
         continue
       }
-      const itemRow = getRenderRowWorktreeItem(
-        row,
-        args.activeWorktreeId,
-        args.activeWorkspaceExecutionHostId ?? undefined
-      )
       if (
         args.pinnedDisplayPolicy === 'duplicate-in-groups' &&
-        itemRow &&
-        !isPinnedWorktreeRow(itemRow)
+        !isPinnedSectionRenderRow(
+          row,
+          args.activeWorktreeId,
+          args.activeWorkspaceExecutionHostId ?? undefined
+        )
       ) {
         return optionId
       }

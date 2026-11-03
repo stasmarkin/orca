@@ -136,7 +136,8 @@ function folderWorkspaceRow(
   }
   return {
     type: 'folder-workspace',
-    key: 'folder-workspace:folder-1',
+    key: 'project-group:group-1:folder-workspace:folder-1',
+    sectionKey: 'project-group:group-1',
     folderWorkspace,
     projectGroup,
     depth: 0,
@@ -609,7 +610,7 @@ describe('addHostSectionRows', () => {
       'repo:local',
       'local-wt',
       'host:ssh:ssh-1',
-      'folder-workspace:folder-1'
+      'project-group:group-1:folder-workspace:folder-1'
     ])
   })
 

@@ -95,7 +95,7 @@ describe('folder workspaces render under every Group by mode', () => {
 
   it('does not duplicate the row under repo grouping', () => {
     const rows = buildSidebarRows({ groupBy: 'repo' })
-    expect(folderRows(rows).map((row) => row.key)).toEqual(['folder-workspace:local|folder:fw-1'])
+    expect(folderRows(rows).map((row) => row.sectionKey)).toEqual([`project-group:${GROUP.id}`])
   })
 
   it('keys the same folder id on two hosts apart, as the desktop draws them', () => {
@@ -107,9 +107,9 @@ describe('folder workspaces render under every Group by mode', () => {
     const rows = folderRows(buildSidebarRows({ groupBy: 'none', folderWorkspaces: folders }))
     expect(new Set(rows.map((row) => row.key))).toEqual(
       new Set([
-        'folder-workspace:local|folder:fw-1',
-        'folder-workspace:runtime:env-1|folder:fw-1',
-        'folder-workspace:ssh:gpu-vm|folder:fw-1'
+        'all:folder-workspace:local|folder:fw-1',
+        'all:folder-workspace:runtime:env-1|folder:fw-1',
+        'all:folder-workspace:ssh:gpu-vm|folder:fw-1'
       ])
     )
     expect(rows.map(getRenderRowKey)).toEqual(rows.map((row) => row.key))
