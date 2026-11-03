@@ -14,6 +14,7 @@ const onClose = vi.fn()
 
 function renderField(props: {
   query: string
+  focusRequested?: boolean
   isFiltering?: boolean
   isTooLarge?: boolean
   matchCount?: number
@@ -23,6 +24,7 @@ function renderField(props: {
     root.render(
       <WorkspaceKanbanSearchField
         query={props.query}
+        focusRequested={props.focusRequested ?? false}
         isFiltering={props.isFiltering ?? props.query.trim() !== ''}
         isTooLarge={props.isTooLarge ?? false}
         matchCount={props.matchCount ?? 0}
@@ -165,5 +167,35 @@ describe('WorkspaceKanbanSearchField', () => {
 
     expect(onClear).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('takes focus when mounted with a focus request', () => {
+    renderField({ query: '', focusRequested: true })
+
+    expect(document.activeElement).toBe(input())
+  })
+
+  it('leaves focus alone without a focus request', () => {
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    outside.focus()
+
+    renderField({ query: '' })
+
+    expect(document.activeElement).toBe(outside)
+    outside.remove()
+  })
+
+  it('refocuses when a request arrives while the field stays mounted', () => {
+    // A toggle reopen inside the drawer's close linger reuses the mounted field.
+    renderField({ query: '', focusRequested: true })
+    renderField({ query: '', focusRequested: false })
+    act(() => {
+      input().blur()
+    })
+
+    renderField({ query: '', focusRequested: true })
+
+    expect(document.activeElement).toBe(input())
   })
 })

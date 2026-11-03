@@ -69,6 +69,12 @@ function appendInput(inside: 'board' | 'app'): HTMLInputElement {
   return field
 }
 
+function appendBoardSearch(): HTMLInputElement {
+  const field = appendInput('board')
+  field.setAttribute('data-workspace-board-search', '')
+  return field
+}
+
 describe('useWorkspaceBoardPanel', () => {
   beforeEach(() => {
     latestState = null
@@ -117,6 +123,122 @@ describe('useWorkspaceBoardPanel', () => {
     expect(panelState().workspaceBoardOpen).toBe(false)
     expect(panelState().workspaceBoardRenderedOpen).toBe(false)
     expect(mocks.recordFeatureInteraction).toHaveBeenCalledOnce()
+  })
+
+  it('requests search focus only when the toggle opens the board', async () => {
+    await renderHookProbe()
+
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+    expect(panelState().workspaceBoardSearchFocusRequested).toBe(true)
+
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+    expect(panelState().workspaceBoardSearchFocusRequested).toBe(false)
+  })
+
+  it('does not request search focus when a drag hover opens the board', async () => {
+    await renderHookProbe()
+
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+    await updatePanel((state) => state.closeWorkspaceBoard())
+    await updatePanel((state) => state.previewWorkspaceBoardFromDrag())
+    expect(panelState().workspaceBoardSearchFocusRequested).toBe(false)
+
+    await updatePanel((state) => state.solidifyWorkspaceBoardFromDrag())
+    expect(panelState().workspaceBoardOpen).toBe(true)
+    expect(panelState().workspaceBoardSearchFocusRequested).toBe(false)
+  })
+
+  it('does not request search focus when the toggle lands during a drag preview', async () => {
+    await renderHookProbe()
+
+    await updatePanel((state) => state.previewWorkspaceBoardFromDrag())
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+
+    expect(panelState().workspaceBoardOpen).toBe(true)
+    expect(panelState().workspaceBoardSearchFocusRequested).toBe(false)
+  })
+
+  it('skips returning focus to an element that is hidden by the time the board closes', async () => {
+    await renderHookProbe()
+    const terminal = appendInput('app')
+    const search = appendBoardSearch()
+    terminal.focus()
+
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+    search.focus()
+    terminal.style.display = 'none'
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+
+    expect(document.activeElement).toBe(search)
+  })
+
+  it('still closes the board without returning focus when checkVisibility is unavailable', async () => {
+    await renderHookProbe()
+    const terminal = appendInput('app')
+    const search = appendBoardSearch()
+    terminal.focus()
+    Object.defineProperty(terminal, 'checkVisibility', { value: undefined })
+
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+    search.focus()
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+
+    expect(panelState().workspaceBoardOpen).toBe(false)
+    expect(document.activeElement).toBe(search)
+  })
+
+  it('returns focus from the board search to where the toggle found it', async () => {
+    await renderHookProbe()
+    const terminal = appendInput('app')
+    const search = appendBoardSearch()
+    terminal.focus()
+
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+    search.focus()
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+
+    expect(document.activeElement).toBe(terminal)
+  })
+
+  it('leaves focus alone on close once it has moved off the board search', async () => {
+    await renderHookProbe()
+    const terminal = appendInput('app')
+    const card = appendInput('board')
+    terminal.focus()
+
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+    card.focus()
+    await updatePanel((state) => state.closeWorkspaceBoard())
+
+    expect(document.activeElement).toBe(card)
+  })
+
+  it('does not return focus after a drag-hover open', async () => {
+    await renderHookProbe()
+    const terminal = appendInput('app')
+    const search = appendBoardSearch()
+    terminal.focus()
+
+    await updatePanel((state) => state.previewWorkspaceBoardFromDrag())
+    await updatePanel((state) => state.solidifyWorkspaceBoardFromDrag())
+    search.focus()
+    await updatePanel((state) => state.closeWorkspaceBoard())
+
+    expect(document.activeElement).toBe(search)
+  })
+
+  it('skips returning focus to an element that left the document', async () => {
+    await renderHookProbe()
+    const terminal = appendInput('app')
+    const search = appendBoardSearch()
+    terminal.focus()
+
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+    search.focus()
+    terminal.remove()
+    await updatePanel((state) => state.toggleWorkspaceBoard())
+
+    expect(document.activeElement).toBe(search)
   })
 
   it('renders a drag preview without recording an open interaction', async () => {

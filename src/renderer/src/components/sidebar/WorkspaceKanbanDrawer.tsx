@@ -33,6 +33,7 @@ type WorkspaceKanbanDrawerProps = {
   statusBarVisible: boolean
   dragPreview: boolean
   preserveOpenForMenu: boolean
+  searchFocusRequested: boolean
   onOpenChange: (open: boolean) => void
   onMenuOpenChange: (open: boolean) => void
 }
@@ -54,6 +55,7 @@ function WorkspaceKanbanDrawerContent({
   statusBarVisible,
   dragPreview,
   preserveOpenForMenu,
+  searchFocusRequested,
   onOpenChange,
   onMenuOpenChange
 }: WorkspaceKanbanDrawerProps): React.JSX.Element {
@@ -259,6 +261,7 @@ function WorkspaceKanbanDrawerContent({
       headerProps={{
         selectedCount: renderedSelectedWorktrees.length,
         query,
+        searchFocusRequested,
         isFiltering: hasQuery,
         isTooLarge: isQueryTooLarge,
         matchCount: matchingWorktreeIds?.size ?? boardWorktrees.length,

@@ -150,6 +150,7 @@ async function renderDrawer(open: boolean, dragPreview = false): Promise<void> {
         statusBarVisible={true}
         dragPreview={dragPreview}
         preserveOpenForMenu={false}
+        searchFocusRequested={false}
         onOpenChange={onOpenChange}
         onMenuOpenChange={onMenuOpenChange}
       />

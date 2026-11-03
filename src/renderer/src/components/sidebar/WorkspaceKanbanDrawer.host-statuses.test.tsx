@@ -154,6 +154,7 @@ function renderDrawer(): void {
         statusBarVisible={true}
         dragPreview={false}
         preserveOpenForMenu={false}
+        searchFocusRequested={false}
         onOpenChange={vi.fn()}
         onMenuOpenChange={vi.fn()}
       />

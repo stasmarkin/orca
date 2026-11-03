@@ -254,6 +254,7 @@ function renderDrawer(item: Worktree, enabled = true, statusBarVisible = true): 
         statusBarVisible={statusBarVisible}
         dragPreview={false}
         preserveOpenForMenu={false}
+        searchFocusRequested={false}
         onOpenChange={vi.fn()}
         onMenuOpenChange={vi.fn()}
       />
