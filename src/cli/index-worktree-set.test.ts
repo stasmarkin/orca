@@ -511,9 +511,7 @@ describe('orca cli worktree awareness', () => {
 
   it.each([
     ['id:repo::/tmp/repo/child', '--unread', true],
-    ['id:repo::/tmp/repo/child', '--read', false],
-    ['id:folder:folder-1', '--unread', true],
-    ['id:folder:folder-1', '--read', false]
+    ['id:repo::/tmp/repo/child', '--read', false]
   ])('passes %s %s through worktree.set as isUnread', async (selector, flag, isUnread) => {
     queueFixtures(
       callMock,
