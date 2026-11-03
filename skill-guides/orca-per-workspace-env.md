@@ -307,11 +307,13 @@ Three named deltas change that shape:
 - **`orca serve --recipe-json` output** is this same object without `userData`. Merge your own
   `userData` into it rather than rebuilding it.
 - **SSH mode** replaces `pairingCode` and `projectRoot` with a `connection` block whose `type` is
-  `"ssh"`, and does not run `orca serve`. The exact target shape is in `references/ssh-host.md`.
+  `"ssh"`, and does not run `orca serve`. The exact target shape is in
+  `ORCA skills get orca-per-workspace-env --reference ssh-host`.
 - **Provisioned root** applies only to direct SSH and only when the user explicitly asked for it. Add
   `checkoutMode: provisioned-root` to the recipe, require `ORCA_RECIPE_RESULT_SCHEMA_VERSION=2`, and
   emit `"schemaVersion": 2` with `"checkoutMode": "provisioned-root"`. Fail if the requested schema
-  is not `2` rather than falling back to the ordinary shape. Details are in `references/ssh-host.md`.
+  is not `2` rather than falling back to the ordinary shape. Details:
+  `ORCA skills get orca-per-workspace-env --reference ssh-host`.
 
 ### The `orca serve` invocation
 
@@ -352,7 +354,7 @@ returned JSON, then `destroy`. Nothing is left running as long as `destroy` work
 
 Run it as a loop: read the `provisionTranscript` in the failed result, fix the script, re-run, until
 `ok` is `true`. Do not wait for the user to paste errors. How to read the transcript is in
-`references/failure-modes.md`.
+`ORCA skills get orca-per-workspace-env --reference failure-modes`.
 
 The self-test sees only what the scripts print, so confirm separately that state holds an
 **authenticated** `snapshotId` and that `destroy` is implemented and tested. With `destroy: none`

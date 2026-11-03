@@ -56,10 +56,10 @@ agent events with `on(...)` (frames: `orca.on`) without `contributes.events`.
 
 ## Reacting to events in a worker
 
-List each in `contributes.events` (`{ "on": "<event>" }`) with the capability `references/events.md`
-shows, then `orca.events.on(event, handler)` in `activate(orca)`. Fire one at the dev plugin with
-`ORCA plugin dev emit . <event> --data '<json>'`, or unit-test it with `mountWorker` (see
-`references/workflow.md`).
+List each in `contributes.events` (`{ "on": "<event>" }`) with the capability
+`ORCA skills get orca-plugin-authoring --reference events` shows, then `orca.events.on(event, handler)`
+in `activate(orca)`. Fire one at the dev plugin with `ORCA plugin dev emit . <event> --data '<json>'`,
+or unit-test it with `mountWorker` (see `ORCA skills get orca-plugin-authoring --reference workflow`).
 
 ## A status bar item a worker updates
 
@@ -75,7 +75,8 @@ keep their value and `visible: false` hides it. Bind a key to the same command w
 
 `trusted-worker` with `main`; list each hook in `contributes.hooks` (`{ "event": "terminal.send" }`)
 and set `engines.orca` to at least `>=1.4.248`. Events, results and what `next` may change are in
-`references/host-api.md` (Hooks). Start from `ORCA plugin create <dir> --template hook`.
+`ORCA skills get orca-plugin-authoring --reference host-api` (Hooks). Start from
+`ORCA plugin create <dir> --template hook`.
 
 ```ts
 export default function activate(orca: OrcaWorkerApi) {
@@ -111,7 +112,7 @@ There is no bundler or network: copy the library's ESM build into the plugin and
 `<script type="importmap">{ "imports": { "lib": "./vendor/lib.js" } }</script>` (16 MiB a script,
 1 MiB a `.ts` file; no `eval`). For types, write a small declaration beside the copied file
 (`vendor/lib.d.ts` for `lib.js`, `.d.mts` for `.mjs`) with only the exports you use, and import
-it by relative path; a package's split `.d.ts` files rarely resolve once copied. Style from the `--orca-*` variables in `references/host-api.md`
+it by relative path; a package's split `.d.ts` files rarely resolve once copied. Style from the `--orca-*` variables in `ORCA skills get orca-plugin-authoring --reference host-api`
 and redo it on `orca.on('theme', ...)`. Orca keeps no undo for editors: the library's own undo
 gets Cmd/Ctrl+Z.
 
