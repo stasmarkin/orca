@@ -17,7 +17,6 @@ import { publishHeadlessRuntimeGraph } from '../runtime/headless-runtime-graph'
 import { OffscreenBrowserBackend } from '../browser/offscreen-browser-backend'
 import { browserManager } from '../browser/browser-manager'
 import { getDesktopRelayStatus } from './main-process-relay-status'
-import { startDesktopRelayService } from './main-process-relay-startup'
 import { getServeOptions, getBundledWebClientRoot, printServeReady } from './main-process-serve'
 import {
   bindTerminalRuntimeStartupServices,
@@ -244,8 +243,7 @@ async function launchDesktopMode(
       showRuntimeRpcStartupFailureDialog(win, runtimeRpcStartResult.error)
     )
   }
-  // Register before proxy await so concurrent token mints wait rather than fail provider_missing; installer requests are already guarded.
-  startDesktopRelayService(runtimeRpc)
+  // fork:local-only — the vendor Relay service is never started; phones reach this desktop over LAN only.
   connectDesktopConnectorCloud()
   // Create the window before awaiting proxy readiness; the request guard already fences fetches.
   await state.initialProxyApplicationReady

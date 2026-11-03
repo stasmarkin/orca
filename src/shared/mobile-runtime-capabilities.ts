@@ -6,7 +6,7 @@ export const NOTIFICATIONS_REMOTE_PUSH_RUNTIME_CAPABILITY = 'notifications.remot
 
 export const MOBILE_RUNTIME_CAPABILITIES = [
   'mobile.tasks.v1',
-  NOTIFICATIONS_REMOTE_PUSH_RUNTIME_CAPABILITY,
+  // fork:local-only — push is off; advertising it would make phones drop LAN-delivered notifications.
   NOTIFICATIONS_DESKTOP_PRESENCE_RUNTIME_CAPABILITY,
   ...MOBILE_RELAY_RUNTIME_CAPABILITIES
 ] as const

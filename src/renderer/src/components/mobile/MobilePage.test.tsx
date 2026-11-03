@@ -196,44 +196,6 @@ describe('MobilePage pairing connection mode', () => {
     expect(window.api.shell.openUrl).toHaveBeenCalledWith('https://www.onorca.dev/docs/android-apk')
   })
 
-  it('defaults signed-in pairing to Anywhere and remints when same-network is selected', async () => {
-    const user = userEvent.setup()
-    await openPairingStep()
-
-    await waitFor(() => expect(getPairingQR).toHaveBeenCalledWith({ connectionMode: 'automatic' }))
-    await waitFor(() => expect(screen.getByTestId('pairing-qr')).toHaveTextContent('base64,qr'))
-    expect(screen.getByTestId('pairing-qr-size')).toHaveTextContent('218')
-    expect(screen.getByTestId('mode')).toHaveTextContent('automatic')
-
-    let resolveRotatedLocalQr: ((value: Record<string, unknown>) => void) | undefined
-    getPairingQR.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveRotatedLocalQr = resolve
-        })
-    )
-    await user.click(screen.getByRole('button', { name: 'LAN' }))
-    // Main rotates on policy mismatch; omitting rotate lets concurrent windows share the same fresh token.
-    await waitFor(() =>
-      expect(getPairingQR).toHaveBeenLastCalledWith({
-        connectionMode: 'local-only'
-      })
-    )
-    expect(screen.getByTestId('mode')).toHaveTextContent('local-only')
-    expect(screen.getByTestId('pairing-qr')).toHaveTextContent('none')
-    expect(screen.getByTestId('pairing-url')).toHaveTextContent('none')
-    expect(mocks.storeState.updateSettings).toHaveBeenCalledWith({
-      mobilePairingConnectionMode: 'local-only'
-    })
-
-    resolveRotatedLocalQr?.({
-      available: true,
-      qrDataUrl: 'data:image/png;base64,local-qr',
-      pairingUrl: 'orca://pair#local'
-    })
-    await waitFor(() => expect(screen.getByTestId('pairing-qr')).toHaveTextContent('local-qr'))
-  })
-
   it('preselects LAN and mints a local-only QR on a signed-out desktop', async () => {
     mocks.storeState.orcaProfileAuthStatus = { state: 'local' }
     await openPairingStep()
@@ -309,103 +271,6 @@ describe('MobilePage pairing connection mode', () => {
     expect(screen.getByTestId('mode')).toHaveTextContent('automatic')
   })
 
-  it('removes the old QR if policy rotation fails', async () => {
-    const user = userEvent.setup()
-    await openPairingStep()
-    await waitFor(() => expect(screen.getByTestId('pairing-qr')).toHaveTextContent('base64,qr'))
-
-    getPairingQR.mockRejectedValueOnce(new Error('rotation failed'))
-    await user.click(screen.getByRole('button', { name: 'LAN' }))
-
-    await waitFor(() => expect(screen.getByTestId('pairing-qr')).toHaveTextContent('none'))
-    expect(screen.getByTestId('pairing-url')).toHaveTextContent('none')
-  })
-
-  it('surfaces Relay failure and requests credential rotation on retry', async () => {
-    getPairingQR.mockResolvedValueOnce({
-      available: false,
-      reason: 'relay_mint_failed',
-      relayFailure: {
-        code: 'relay_control_not_active',
-        stage: 'create_pairing_relay',
-        message: 'Relay pairing invite request failed'
-      }
-    })
-    const user = userEvent.setup()
-    await openPairingStep()
-    await waitFor(() =>
-      expect(screen.getByTestId('relay-failure')).toHaveTextContent('create_pairing_relay')
-    )
-
-    getPairingQR.mockResolvedValueOnce({
-      available: true,
-      qrDataUrl: 'data:image/png;base64,retried',
-      pairingUrl: 'orca://pair#retried',
-      endpoint: 'ws://host',
-      connectionMode: 'automatic'
-    })
-    await user.click(screen.getByRole('button', { name: 'Retry Relay' }))
-
-    await waitFor(() =>
-      expect(getPairingQR).toHaveBeenLastCalledWith({
-        connectionMode: 'automatic',
-        rotate: true
-      })
-    )
-    await waitFor(() => expect(screen.getByTestId('pairing-qr')).toHaveTextContent('retried'))
-    expect(screen.getByTestId('relay-failure')).toHaveTextContent('none')
-  })
-
-  it('switches to LAN while a Relay retry is still unresolved', async () => {
-    getPairingQR.mockResolvedValueOnce({
-      available: false,
-      reason: 'relay_mint_failed',
-      relayFailure: {
-        code: 'relay_mint_failed',
-        stage: 'create_pairing_relay',
-        message: 'Relay pairing invite request failed'
-      }
-    })
-    const user = userEvent.setup()
-    await openPairingStep()
-    await waitFor(() =>
-      expect(screen.getByTestId('relay-failure')).toHaveTextContent('create_pairing_relay')
-    )
-
-    let resolveRetry: ((value: Record<string, unknown>) => void) | undefined
-    getPairingQR.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveRetry = resolve
-        })
-    )
-    getPairingQR.mockResolvedValueOnce({
-      available: true,
-      qrDataUrl: 'data:image/png;base64,local',
-      pairingUrl: 'orca://pair#local',
-      endpoint: 'ws://host',
-      connectionMode: 'local-only'
-    })
-    await user.click(screen.getByRole('button', { name: 'Retry Relay' }))
-    await user.click(screen.getByRole('button', { name: 'LAN' }))
-
-    await waitFor(() =>
-      expect(getPairingQR).toHaveBeenLastCalledWith({ connectionMode: 'local-only' })
-    )
-    await waitFor(() => expect(screen.getByTestId('pairing-qr')).toHaveTextContent('base64,local'))
-    await act(async () => {
-      resolveRetry?.({
-        available: true,
-        qrDataUrl: 'data:image/png;base64,stale-relay',
-        pairingUrl: 'orca://pair#stale-relay',
-        endpoint: 'ws://relay',
-        connectionMode: 'automatic'
-      })
-    })
-    await waitFor(() => expect(screen.getByTestId('pairing-qr')).toHaveTextContent('base64,local'))
-    expect(screen.getByTestId('mode')).toHaveTextContent('local-only')
-  })
-
   it('does not commit a custom direct address when its QR preflight fails', async () => {
     const user = userEvent.setup()
     await openPairingStep()
@@ -416,7 +281,7 @@ describe('MobilePage pairing connection mode', () => {
       qrError: 'encoding_failed',
       pairingUrl: 'orca://pair?code=copy-fallback',
       endpoint: 'wss://custom.example/large',
-      connectionMode: 'automatic'
+      connectionMode: 'local-only'
     })
 
     await user.click(screen.getByRole('button', { name: 'Confirm custom address' }))
@@ -424,7 +289,7 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() =>
       expect(getPairingQR).toHaveBeenLastCalledWith({
         address: 'wss://custom.example/large',
-        connectionMode: 'automatic'
+        connectionMode: 'local-only'
       })
     )
     expect(getPairingQR).toHaveBeenCalledTimes(2)
@@ -476,7 +341,7 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() =>
       expect(getPairingQR).toHaveBeenLastCalledWith({
         address: '10.0.0.2',
-        connectionMode: 'automatic',
+        connectionMode: 'local-only',
         rotate: true
       })
     )
@@ -494,7 +359,7 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() =>
       expect(getPairingQR).toHaveBeenCalledWith({
         address: '10.0.0.5',
-        connectionMode: 'automatic'
+        connectionMode: 'local-only'
       })
     )
 
@@ -524,7 +389,7 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() => expect(getPairingQR).toHaveBeenCalledTimes(1))
     expect(getPairingQR).toHaveBeenCalledWith({
       address: '10.0.0.9',
-      connectionMode: 'automatic'
+      connectionMode: 'local-only'
     })
   })
 
@@ -572,7 +437,7 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() => expect(getPairingQR).toHaveBeenCalledTimes(1))
     expect(getPairingQR).toHaveBeenCalledWith({
       address: '10.0.0.5',
-      connectionMode: 'automatic'
+      connectionMode: 'local-only'
     })
 
     await user.click(screen.getByRole('button', { name: 'Back' }))
@@ -596,7 +461,7 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() => expect(getPairingQR).toHaveBeenCalledTimes(1))
     expect(getPairingQR).toHaveBeenCalledWith({
       address: '10.0.0.9',
-      connectionMode: 'automatic'
+      connectionMode: 'local-only'
     })
   })
 
@@ -642,7 +507,7 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() => expect(getPairingQR).toHaveBeenCalledTimes(1))
     expect(getPairingQR).toHaveBeenCalledWith({
       address: '10.0.0.9',
-      connectionMode: 'automatic'
+      connectionMode: 'local-only'
     })
   })
 
@@ -687,7 +552,7 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() => expect(getPairingQR).toHaveBeenCalledTimes(1))
     expect(getPairingQR).toHaveBeenCalledWith({
       address: '10.0.0.9',
-      connectionMode: 'automatic'
+      connectionMode: 'local-only'
     })
   })
 
@@ -757,7 +622,7 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() => expect(getPairingQR).toHaveBeenCalledTimes(2))
     expect(getPairingQR).toHaveBeenLastCalledWith({
       address: '10.0.0.7',
-      connectionMode: 'automatic',
+      connectionMode: 'local-only',
       rotate: true
     })
 

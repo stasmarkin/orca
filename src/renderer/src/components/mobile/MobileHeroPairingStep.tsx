@@ -6,7 +6,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/colla
 import type { MobileNetworkInterface } from '../settings/mobile-network-interface-selection'
 import { NetworkInterfacePicker } from './NetworkInterfacePicker'
 import { MobilePairingConnectionOptions } from '../settings/MobilePairingConnectionOptions'
-import { MobileRelayBetaNotice } from '../settings/MobileRelayBetaNotice'
 import { MachineNameField } from '../settings/MachineNameField'
 import { MobileRelayMintFailureNotice } from './mobile-relay-mint-failure-notice'
 import { WindowsFirewallNotice } from './WindowsFirewallNotice'
@@ -210,7 +209,6 @@ export function MobileHeroPairingStep({
           relayMintFailed={relayMintFailure != null}
           relayMintRetrying={relayMintFailure != null && pairLoading}
         />
-        <MobileRelayBetaNotice className="mt-1.5" />
       </div>
       {relayMintFailure != null ? (
         <MobileRelayMintFailureNotice

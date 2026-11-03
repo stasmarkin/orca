@@ -8,7 +8,6 @@ import {
 } from './mobile-settings-search'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
-import { MobileRelayBetaNotice } from './MobileRelayBetaNotice'
 import { openAppHttpLink } from '@/lib/app-http-link-open'
 export { getMobileSettingsPaneSearchEntries }
 
@@ -60,7 +59,6 @@ export function MobileSettingsPane(): React.JSX.Element {
               ', then pair below.'
             )}
           </p>
-          <MobileRelayBetaNotice />
         </div>
       </SearchableSetting>
 

@@ -72,7 +72,8 @@ export function MobilePairingConnectionOptions({
   const configured = authStatus?.configured !== false
   const needsSignIn = value === 'automatic' && !signedIn && configured
   // Availability is a property of the build, not of the current selection.
-  const relayUnavailable = !signedIn && !configured
+  // fork:local-only — Relay is never offered; its row stays only as a disabled "not in this build" notice.
+  const relayUnavailable = true
   const relayDisabled = relayMintRetrying || relayUnavailable
   const optionRefs = useRef<Record<MobilePairingConnectionMode, HTMLDivElement | null>>({
     automatic: null,
