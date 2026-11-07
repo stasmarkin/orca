@@ -18,6 +18,7 @@ import { useNow } from '@/hooks/use-now'
 import { isDelayedUpdatePending } from '../../../../../shared/update-delay'
 import { getReleaseNotesUrlForVersion } from '../../../../../shared/release-channel'
 import { openAppHttpLinkFromAnchor } from '@/lib/app-http-link-open'
+import { APP_UPDATES_ENABLED } from '../../../../../shared/fork-app-updates'
 
 export function GeneralUpdateSettingsSection(): React.JSX.Element {
   const updateStatus = useAppStore((s) => s.updateStatus)
@@ -82,6 +83,26 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
         />
       </div>
 
+      {APP_UPDATES_ENABLED ? null : (
+        <SearchableSetting
+          title={translate(
+            'auto.components.settings.GeneralUpdateSettingsSection.e1a647adc5',
+            'Check for Updates'
+          )}
+          description={translate(
+            'settings.forkBuild.updatesViaForkBuild',
+            'This build updates only by rebuilding the fork; Orca does not check for releases.'
+          )}
+          keywords={['update', 'version', 'release notes', 'download']}
+        >
+          <p className="text-xs text-muted-foreground">
+            {translate(
+              'settings.forkBuild.updatesViaForkBuild',
+              'This build updates only by rebuilding the fork; Orca does not check for releases.'
+            )}
+          </p>
+        </SearchableSetting>
+      )}
       <SearchableSetting
         title={translate(
           'auto.components.settings.GeneralUpdateSettingsSection.e1a647adc5',
@@ -93,6 +114,7 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
         )}
         keywords={['update', 'version', 'release notes', 'download']}
         className="space-y-3"
+        forceHidden={!APP_UPDATES_ENABLED}
       >
         <div className="flex items-center gap-3">
           <Button
@@ -284,8 +306,8 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
                     ))}
         </p>
       </SearchableSetting>
-      <UpdateDelaySetting />
-      {channelSwitcherRevealed ? <ReleaseChannelSection /> : null}
+      {APP_UPDATES_ENABLED ? <UpdateDelaySetting /> : null}
+      {APP_UPDATES_ENABLED && channelSwitcherRevealed ? <ReleaseChannelSection /> : null}
       <GeneralRemoteServerUpdates />
     </section>
   )

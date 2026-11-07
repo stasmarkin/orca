@@ -3,9 +3,13 @@ import { isMacInstallRequested } from '../mac-install/updater-mac-install'
 import type { UpdateCheckOptions } from '../../../shared/update-status-types'
 import type { ReleaseChannel } from '../../../shared/release-channel'
 import { UpdaterScheduling } from './updater-scheduling'
+import { APP_UPDATES_ENABLED } from '../../../shared/fork-app-updates'
 
 export abstract class UpdaterMenuChecks extends UpdaterScheduling {
   protected checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
+    if (!APP_UPDATES_ENABLED) {
+      return
+    }
     if (
       this.pendingQuitAndInstallTimer ||
       this.quitAndInstallInProgress ||

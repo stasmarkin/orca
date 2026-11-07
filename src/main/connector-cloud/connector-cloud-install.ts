@@ -10,6 +10,8 @@ import { resolveConnectorOrigin } from './connector-origin'
 import { connectorProjects, type ConnectorPlacesStore } from './connector-places'
 import { connectorAccount, desktopConnectorTokenMint } from './connector-token-mint'
 
+const CONNECTOR_CLOUD_ENABLED = false
+
 export type ConnectorCloudStore = ConnectorPlacesStore &
   Pick<RuntimeStore, 'getSettings' | 'onSettingsChanged'>
 
@@ -20,6 +22,10 @@ export function createDesktopConnectorCloud(
   userDataPath: string,
   isFenced: () => boolean
 ): ConnectorCloud | null {
+  // fork:local-only — the vendor Cloud Connector never starts, whatever the sign-in or experimentalConnectors.
+  if (!CONNECTOR_CLOUD_ENABLED) {
+    return null
+  }
   const auth = getOrcaCloudAuthConfig()
   if (!auth.configured) {
     return null

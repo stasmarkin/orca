@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Fork-only gate: fails when an upstream merge brings back telemetry, vendor Relay, or vendor push.
+// Fork-only gate: fails when an upstream merge brings back telemetry, vendor Relay, push, Cloud Connector or auto-update.
 // Offline and deterministic. Usage: node config/scripts/fork-check-no-telemetry.mjs [--root <checkout>]
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
@@ -68,7 +68,7 @@ const ALLOWED_PACKAGES = new Map([
   ['@posthog/types', 'transitive dependency of posthog-node']
 ])
 
-// Telemetry hosts plus the vendor's phone Relay and push gateway.
+// Telemetry hosts plus the vendor's phone Relay, push gateway, Cloud Connector and release/update feeds.
 const DENIED_HOSTS = [
   /\b[a-z0-9.-]*posthog\.com\b/,
   /\b[a-z0-9.-]*sentry\.io\b/,
@@ -97,8 +97,15 @@ const DENIED_HOSTS = [
   /\bfirebaselogging[a-z-]*\.googleapis\.com\b/,
   /\brelay(-[a-z0-9]+)?\.onorca\.dev\b/,
   /\bpush\.onorca\.dev\b/,
+  /\bconnector\.onorca\.dev\b/,
+  /\bonorca\.dev\/whats-new\b/,
+  /\bgithub\.com\/stablyai\/orca\/releases(\.atom|\/latest\/download|\/latest|\/download)\b/,
+  /\bapi\.github\.com\/repos\/[^'"`\s]*\/releases\b/,
   /\b(telemetry|analytics|metrics|ingest|events|tracking|crash|errors|flags|experiments)[a-z0-9-]*\.(onorca\.dev|orca\.dev|stably\.ai|stablyai\.com)\b/
 ]
+
+const UPDATER_WHY =
+  'desktop updater; setup, checks and build listing return early while APP_UPDATES_ENABLED is false'
 
 // file → the only denied hosts it may name, and why they cannot be contacted in this fork.
 const ALLOWED_HOST_FILES = new Map([
@@ -130,6 +137,52 @@ const ALLOWED_HOST_FILES = new Map([
   [
     'mobile/src/transport/mobile-endpoint-supervisor-test-fakes.ts',
     { hosts: /^relay(-c\d+)?\.onorca\.dev$/, why: 'test fakes, never contacted' }
+  ],
+  [
+    'src/main/connector-cloud/connector-origin.ts',
+    {
+      hosts: /^connector\.onorca\.dev$/,
+      why: 'Cloud Connector default; createDesktopConnectorCloud returns null'
+    }
+  ],
+  [
+    'src/main/updater/lifecycle/updater-setup.ts',
+    { hosts: /^github\.com\/stablyai\/orca\/releases\/latest\/download$/, why: UPDATER_WHY }
+  ],
+  [
+    'src/main/updater/releases/updater-prerelease-feed.ts',
+    { hosts: /^github\.com\/stablyai\/orca\/releases(\.atom|\/latest)$/, why: UPDATER_WHY }
+  ],
+  [
+    'src/main/updater/releases/updater-release-readiness.ts',
+    { hosts: /^github\.com\/stablyai\/orca\/releases\/download$/, why: UPDATER_WHY }
+  ],
+  [
+    'src/main/updater/releases/updater-release-builds.ts',
+    { hosts: /^api\.github\.com\/repos\/\$\{repo\}\/releases$/, why: UPDATER_WHY }
+  ],
+  [
+    'src/main/updater/nudges/nudge-campaign.ts',
+    { hosts: /^onorca\.dev\/whats-new$/, why: UPDATER_WHY }
+  ],
+  [
+    'src/main/updater/releases/updater-changelog.ts',
+    { hosts: /^onorca\.dev\/whats-new$/, why: UPDATER_WHY }
+  ],
+  [
+    'src/main/updater/testing/updater-test-harness.ts',
+    {
+      hosts: /^github\.com\/stablyai\/orca\/releases\/download$/,
+      why: 'test harness, never contacted'
+    }
+  ],
+  [
+    'mobile/src/app-update/fixtures/github-release-mobile-android-v0.0.50.json',
+    {
+      hosts:
+        /^(github\.com\/stablyai\/orca\/releases\/download|api\.github\.com\/repos\/stablyai\/orca\/releases)$/,
+      why: 'test fixture data, never contacted'
+    }
   ]
 ])
 
@@ -168,6 +221,43 @@ const KILL_SWITCHES = [
     mustNotMatch:
       /MOBILE_RUNTIME_CAPABILITIES = \[[^\]]*NOTIFICATIONS_REMOTE_PUSH_RUNTIME_CAPABILITY/,
     what: 'hosts must not advertise remote push, or phones drop LAN-delivered notifications'
+  },
+  {
+    file: 'src/shared/fork-app-updates.ts',
+    mustMatch: /^export const APP_UPDATES_ENABLED = false$/m,
+    what: 'desktop auto-update flag must be false; the fork updates through its own build'
+  },
+  {
+    file: 'src/main/updater/lifecycle/updater-setup.ts',
+    mustMatch: /if \(!app\.isPackaged \|\| !APP_UPDATES_ENABLED\) \{\s*return\s*\}/,
+    what: 'updater setup must not configure the feed, schedule checks or fetch nudges'
+  },
+  {
+    file: 'src/main/updater/lifecycle/updater-setup.ts',
+    mustMatch: /Promise<ReleaseBuild\[\]> \{\s*if \(!APP_UPDATES_ENABLED\) \{\s*return \[\]\s*\}/,
+    what: 'release build listing must not query GitHub'
+  },
+  {
+    file: 'src/main/updater/lifecycle/updater-scheduling.ts',
+    mustMatch: /\): boolean \{\s*if \(!APP_UPDATES_ENABLED\) \{\s*return false\s*\}/,
+    what: 'background update checks must never launch'
+  },
+  {
+    file: 'src/main/updater/lifecycle/updater-menu-checks.ts',
+    mustMatch:
+      /checkForUpdatesFromMenu\(options\?: UpdateCheckOptions\): void \{\s*if \(!APP_UPDATES_ENABLED\) \{\s*return\s*\}/,
+    what: 'manual, pinned and local-build update checks must not reach the feed'
+  },
+  {
+    file: 'src/main/connector-cloud/connector-cloud-install.ts',
+    mustMatch: /^const CONNECTOR_CLOUD_ENABLED = false$/m,
+    what: 'Cloud Connector flag must be false'
+  },
+  {
+    file: 'src/main/connector-cloud/connector-cloud-install.ts',
+    mustMatch:
+      /\): ConnectorCloud \| null \{\s*\/\/ fork:local-only[^\n]*\n\s*if \(!CONNECTOR_CLOUD_ENABLED\) \{\s*return null\s*\}/,
+    what: 'desktop Cloud Connector must never be created (no connector.onorca.dev, no cloud commands)'
   }
 ]
 
@@ -193,6 +283,10 @@ const FORBIDDEN_CALLS = [
     allowedIn: ['src/main/runtime/mobile-cloud-relay/desktop-relay-service.ts']
   },
   { re: /\bnew PushGatewayClient\s*\(/, allowedIn: [] },
+  {
+    re: /\bnew ConnectorCloud\s*\(/,
+    allowedIn: ['src/main/connector-cloud/connector-cloud-install.ts']
+  },
   { re: /\bnew DesktopPushService\s*\(/, allowedIn: [] }
 ]
 

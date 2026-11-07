@@ -1216,7 +1216,10 @@
       "save": "Save formatter",
       "placeholder": "npx --no-install prettier --stdin-filepath \"${file}\""
     },
-    "experimental": {}
+    "experimental": {},
+    "forkBuild": {
+      "updatesViaForkBuild": "This build updates only by rebuilding the fork; Orca does not check for releases."
+    }
   },
   "menu": {
     "checkForUpdates": "Check for Updates...",

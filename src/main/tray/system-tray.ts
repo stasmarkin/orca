@@ -4,6 +4,7 @@ import menuBarIconRetinaPath from '../../../resources/tray/orca-menu-barTemplate
 import { deferAppKitSceneMutation } from '../window/desktop-integration/appkit-scene-mutation'
 import { createAppIconImage } from '../window/desktop-integration/app-icon'
 import { translateMain } from '../i18n/main-i18n'
+import { APP_UPDATES_ENABLED } from '../../shared/fork-app-updates'
 import { quitAndStopAllSessionsMenuText } from '../menu/app-menu-quit-item'
 import { composeTrayAttentionIcon, tintTrayTemplateForAttention } from './tray-attention-icon'
 import { stampTrayDevBadge } from './tray-dev-badge'
@@ -263,6 +264,7 @@ function buildTrayMenu(opts: SystemTrayOptions): Menu {
           },
           {
             label: translateMain('menu.checkForUpdates', 'Check for Updates...'),
+            visible: APP_UPDATES_ENABLED,
             click: safeMenuAction(() => opts.onCheckForUpdates())
           },
           { type: 'separator' }

@@ -7,6 +7,7 @@ import {
 } from '../../shared/keybindings'
 import type { UpdateCheckOptions } from '../../shared/update-status-types'
 import { translateMain } from '../i18n/main-i18n'
+import { APP_UPDATES_ENABLED } from '../../shared/fork-app-updates'
 import { createAppMenuSelectionItem, resolveNativeEditTarget } from './app-menu-selection-item'
 import { createAppMenuQuitItems, type AppMenuQuitHandlers } from './app-menu-quit-item'
 import { createAppMenuReloadAndDevToolsItems } from './app-menu-reload-devtools-items'
@@ -95,6 +96,7 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
 
   const checkForUpdatesItem: Electron.MenuItemConstructorOptions = {
     label: translateMain('menu.checkForUpdates', 'Check for Updates...'),
+    visible: APP_UPDATES_ENABLED,
     click: checkForUpdatesClick
   }
 
