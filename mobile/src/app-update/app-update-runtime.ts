@@ -11,12 +11,16 @@ import { appStoreUpdateSource } from './app-store-update-source'
 import { createAppUpdateChecker, type AppUpdateState } from './app-update-checker'
 import type { AppUpdateSource } from './app-update-source'
 import { githubReleaseUpdateSource } from './github-release-update-source'
+import { APP_UPDATES_ENABLED } from '../../../src/shared/fork-app-updates'
 
 // expoConfig is embedded binary manifest because app does not use expo-updates; SDK 55 removed nativeAppVersion. Revisit version source if adopting OTA updates.
 export const installedAppVersion: string | null = Constants.expoConfig?.version ?? null
 
 /** The channel that installed this binary. */
 function resolveAppUpdateSource(): AppUpdateSource | null {
+  if (!APP_UPDATES_ENABLED) {
+    return null
+  }
   if (Platform.OS === 'android') {
     return githubReleaseUpdateSource
   }
@@ -40,7 +44,10 @@ export const appUpdateChecker = createAppUpdateChecker({
     })
     return () => subscription.remove()
   },
-  loadPreferences: loadAppUpdatePreferences,
+  // A release seen before updates were disabled must not resurface as an update card or wall.
+  loadPreferences: APP_UPDATES_ENABLED
+    ? loadAppUpdatePreferences
+    : async () => ({ ...(await loadAppUpdatePreferences()), latest: null }),
   saveCheck: saveAppUpdateCheck,
   saveDismissedVersion: saveDismissedAppUpdateVersion
 })

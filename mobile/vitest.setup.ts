@@ -14,5 +14,7 @@ vi.mock('react-native-svg', () => ({
 
 // The reserved-regions module is iOS-only native code; tests run as a platform without it.
 vi.mock('./modules/orca-reserved-regions/src', () => ({ OrcaReservedRegions: null }))
+// fork:local-only — upstream suites exercise live app updates; src/app-update/fork-app-updates.test.ts restores the real flag.
+vi.mock('../src/shared/fork-app-updates', () => ({ APP_UPDATES_ENABLED: true }))
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })

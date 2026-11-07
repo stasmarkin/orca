@@ -1,4 +1,5 @@
 import { useWallAppUpdate } from '../app-update/use-wall-app-update'
+import { APP_UPDATES_ENABLED } from '../../../src/shared/fork-app-updates'
 import { openExternalLink } from '../platform/external-link'
 import { useRouteHandoff } from '../navigation/route-handoff'
 import { Platform, Pressable, Text, View } from 'react-native'
@@ -118,7 +119,7 @@ export function ProtocolBlockScreen({ verdict }: Props) {
     : { label: mobileUpdateTarget.label, url: mobileUpdateTarget.url }
   // No download to offer when the fix is a refetch: reconnecting is what this screen leaves you to do.
   const primaryAction =
-    remedy === 'refresh-bundle'
+    remedy === 'refresh-bundle' || !APP_UPDATES_ENABLED
       ? null
       : remedy === 'update-mobile'
         ? mobileAction

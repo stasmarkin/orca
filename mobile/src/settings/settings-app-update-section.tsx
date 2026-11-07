@@ -6,6 +6,7 @@ import {
   useAppUpdateState
 } from '../app-update/app-update-runtime'
 import { AppUpdateSettingsRows, type AppUpdateCheckRowStatus } from './app-update-settings-rows'
+import { APP_UPDATES_ENABLED } from '../../../src/shared/fork-app-updates'
 
 const CHECK_RESULT_VISIBLE_MS = 3000
 const RELATIVE_TIME_TICK_MS = 60_000
@@ -45,7 +46,7 @@ export function SettingsAppUpdateSection() {
       now={now}
       checkStatus={checkStatus}
       onUpdate={openAppUpdate}
-      onCheck={runCheck}
+      onCheck={APP_UPDATES_ENABLED ? runCheck : null}
     />
   )
 }

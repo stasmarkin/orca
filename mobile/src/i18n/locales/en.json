@@ -39,7 +39,8 @@
       "update": "Update",
       "installedVersion": "Version {{version}}",
       "checkUpdatesStatus": "Check for updates, {{status}}",
-      "checkUpdates": "Check for updates"
+      "checkUpdates": "Check for updates",
+      "updatesViaForkBuild": "Updates come from rebuilding the fork"
     },
     "browserSettingsScreen": {
       "desktopBrowser": "Orca browser on desktop",

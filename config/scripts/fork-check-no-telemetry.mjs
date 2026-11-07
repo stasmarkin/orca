@@ -101,11 +101,15 @@ const DENIED_HOSTS = [
   /\bonorca\.dev\/whats-new\b/,
   /\bgithub\.com\/stablyai\/orca\/releases(\.atom|\/latest\/download|\/latest|\/download)\b/,
   /\bapi\.github\.com\/repos\/[^'"`\s]*\/releases\b/,
+  /\bapi\.github\.com\/repos\/stablyai\/orca\b/,
+  /\bitunes\.apple\.com\/lookup\b/,
   /\b(telemetry|analytics|metrics|ingest|events|tracking|crash|errors|flags|experiments)[a-z0-9-]*\.(onorca\.dev|orca\.dev|stably\.ai|stablyai\.com)\b/
 ]
 
 const UPDATER_WHY =
   'desktop updater; setup, checks and build listing return early while APP_UPDATES_ENABLED is false'
+const MOBILE_UPDATER_WHY =
+  'mobile update source; app-update-runtime resolves no source while APP_UPDATES_ENABLED is false'
 
 // file → the only denied hosts it may name, and why they cannot be contacted in this fork.
 const ALLOWED_HOST_FILES = new Map([
@@ -180,9 +184,24 @@ const ALLOWED_HOST_FILES = new Map([
     'mobile/src/app-update/fixtures/github-release-mobile-android-v0.0.50.json',
     {
       hosts:
-        /^(github\.com\/stablyai\/orca\/releases\/download|api\.github\.com\/repos\/stablyai\/orca\/releases)$/,
+        /^(github\.com\/stablyai\/orca\/releases\/download|api\.github\.com\/repos\/stablyai\/orca(\/releases)?)$/,
       why: 'test fixture data, never contacted'
     }
+  ],
+  [
+    'mobile/src/app-update/fixtures/github-mobile-android-tag-refs.json',
+    {
+      hosts: /^api\.github\.com\/repos\/stablyai\/orca$/,
+      why: 'test fixture data, never contacted'
+    }
+  ],
+  [
+    'mobile/src/app-update/github-release-update-source.ts',
+    { hosts: /^api\.github\.com\/repos\/stablyai\/orca$/, why: MOBILE_UPDATER_WHY }
+  ],
+  [
+    'mobile/src/app-update/app-store-update-source.ts',
+    { hosts: /^itunes\.apple\.com\/lookup$/, why: MOBILE_UPDATER_WHY }
   ]
 ])
 
@@ -247,6 +266,29 @@ const KILL_SWITCHES = [
     mustMatch:
       /checkForUpdatesFromMenu\(options\?: UpdateCheckOptions\): void \{\s*if \(!APP_UPDATES_ENABLED\) \{\s*return\s*\}/,
     what: 'manual, pinned and local-build update checks must not reach the feed'
+  },
+  {
+    file: 'mobile/src/app-update/app-update-runtime.ts',
+    mustMatch:
+      /function resolveAppUpdateSource\(\): AppUpdateSource \| null \{\s*if \(!APP_UPDATES_ENABLED\) \{\s*return null\s*\}/,
+    what: 'mobile app must not check GitHub releases or the App Store for updates'
+  },
+  {
+    file: 'mobile/src/app-update/app-update-runtime.ts',
+    mustMatch:
+      /loadPreferences: APP_UPDATES_ENABLED\s*\?\s*loadAppUpdatePreferences\s*:[^\n]*latest: null/,
+    what: 'a stored vendor release must not resurface as a mobile update card or wall'
+  },
+  {
+    file: 'mobile/src/settings/settings-app-update-section.tsx',
+    mustMatch: /onCheck=\{APP_UPDATES_ENABLED \? runCheck : null\}/,
+    what: 'mobile settings must not show a Check for updates row that can only fail'
+  },
+  {
+    file: 'mobile/src/components/ProtocolBlockScreen.tsx',
+    mustMatch:
+      /const primaryAction =\s*remedy === 'refresh-bundle' \|\| !APP_UPDATES_ENABLED\s*\?\s*null/,
+    what: 'the compatibility wall must not send fork users to vendor App Store or GitHub Releases builds'
   },
   {
     file: 'src/main/connector-cloud/connector-cloud-install.ts',
